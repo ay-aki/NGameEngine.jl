@@ -44,11 +44,32 @@ function app_1()
     println(g.info)
 end
 
+function app_2()
+    line = Line(v = [200, 100], lw = 4)
+    font = Font(file = "..\\assets\\ttf_files\\Noto_Sans_JP\\NotoSansJP-VariableFont_wght.ttf")
+    str1 = Moji("Hello_World!", font)
+    str1 = Tf(a=1.5) * str1
+    str2 = Tf(c=RGBA(1, 0, 0, 0.5)) * str1
+    while update!(g)
+        draw(line, [0, 0], c=RGBA(1, 1, 0, 1))
+        draw_at(str1, g.system.mouse.x)
+        draw(str2, [300, 300])
+        sleep(0.01)
+    end
+end
+
+function app_3()
+    gr = Grid()
+    while update!(g)
+        draw(gr, [0, 0])
+        sleep(0.01)
+    end
+end
 
 
 
 
-g.main = app_1
+g.main = app_3
 
 runapp(g)
 

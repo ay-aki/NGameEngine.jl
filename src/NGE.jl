@@ -7,6 +7,14 @@ using Colors, LinearAlgebra
 
 global section, win, renderer, event_ref, events, t0, t_old
 
+global reserve_close
+reserve_close = [] # close all
+
+global reserve_destroy
+reserve_destroy = [] # destroy all
+
+# this_directory = dirname(this_file)
+
 #= 
 設計指向
 > Siv3dを参考にしたい。
@@ -80,13 +88,24 @@ mutable struct System
 end
 export System
 
-f_blank = () -> ()
+
+
+"""
+# App \\
+`g = App()` で初期化 \\
+`g.scene.w` でウインドウサイズを取得 \\
+`g.scene.center` でウインドウの中心座標を取得 \\
+`g.scene.t` で現在時間を取得 \\
+`g.scene.dt` で前フレームとの時間差を取得 \\
+`g.system.keyboard.scans[:w].down` でキーボードのwが押されたかを取得 \\
+※ただし、`register_keys!(g, [..., :w, ...])` が実行されている必要がある。 \\
+"""
 mutable struct App
     info::Info
     scene::Scene
     system::System
     main::Function
-    App() = new(Info(), Scene(), System(), f_blank)
+    App() = new(Info(), Scene(), System(), () -> ())
 end
 export App
 
@@ -115,57 +134,100 @@ end
 
 
 
-#=  
-# Grid
+
+function grid_adjust_w_x_wx(w, x, wx)
+    if w .* x != wx
+        if     w  != [ 32,  32] w  = intround(wx ./ x)
+        elseif x  != [ 20,  15] x  = intround(wx ./ w)
+        elseif wx != [640, 480] wx = intround(w  .* x)
+        end
+    end
+    return w, x, wx
+end
+function grid_make_pos(w, x)
+    pos = fill(Int.(zeros(2)), Tuple(x))
+    for i = 1:x[1]
+        for j = 1:x[2]
+            pos[i, j] = ([i, j] .- 1) .* w
+        end
+    end
+    return pos
+end
+# 未使用関数
+function grid_make_from_ofs(ofs, wx)
+    upperleft  = ofs
+    middleleft = ofs + [0, wx[2]] .÷ 2
+    lowerleft  = ofs + [0, wx[2]]
+    upperright = ofs + [wx[1], 0]
+    middleright= ofs + [wx[1], 0] .÷ 2
+    lowerright = ofs + wx
+    return (
+          intround.(upperleft)
+        , intround.(middleleft)
+        , intround.(lowerleft)
+        , intround.(upperright)
+        , intround.(middleright)
+        , intround.(lowerright)
+    )
+end
+
+"""
+# Grid \\
 32*32のサイズのgridを作り、gridの配置を20*15で構築する \\
 gr = Grid(w = [32, 32], x = [20, 15]) \\
-例えば、配置したい座標は以下のようにイテレーションできる
-=#
+Gridそのものを動かすことは余り
+"""
 mutable struct Grid
     w::AbstractArray  # gridwidth
     x::AbstractArray  # [i, j] grids
     wx::AbstractArray # w.*x
-    pos::AbstractArray# upperleft position of grid
+    pos::AbstractArray# upperleft position of grid [i, j]でアクセス
     Grid(grid::Grid) = Grid(w = grid.w, x = grid.x, wx = grid.wx)
     function Grid(
         ; w  = [ 32,  32]
         , x  = [ 20,  15]
         , wx = [640, 480]
+        , ofs= [  0,   0]
     )
-        if w .* x != wx
-            if     w  != [ 32,  32] w  = intround(wx ./ x)
-            elseif x  != [ 20,  15] x  = intround(wx ./ w)
-            elseif wx != [640, 480] wx = intround(w  .* x)
-            end
-        end
-        pos = fill(Int.(zeros(2)), Tuple(x))
-        for i = 1:x[1]
-            for j = 1:x[2]
-                pos[i, j] = ([i, j] .- 1) .* w
-            end
-        end
+        w, x, wx = grid_adjust_w_x_wx(w, x, wx)
+        pos = grid_make_pos(w, x)
         return new(w, x, wx, pos)
     end
 end
 export Grid
+function draw(gr::Grid, x::AbstractArray; c=RGBA(1, 1, 1, 1)) # x = girdの右上座標 draw_atは未定義
+    color_r = sdl_get_render_draw_color(renderer)
+    sdl_set_render_draw_color(renderer, c)    
+    n, m = gr.x
+    for i = 1:n
+        for j = 1:m
+            sdl_render_draw_rect(renderer, x + gr.pos[i, j], gr.w)
+        end
+    end
+    sdl_set_render_draw_color(renderer, color_r)
+end
+export draw
 
 
 
-#=
-Tf
-移動や回転、色の変更を与える。
-=#
+"""
+# Tf \\
+移動や回転、色の変更を与える。 \\
+カラー属性は２つを掛け合わせると消失する。\\
+"""
 mutable struct Tf
     a::AbstractArray
     θ::Real
-    Tf(tf::Tf) = Tf(a=tf.a, θ=tf.θ)
+    c::Union{AbstractRGBA, DataType}
+    Tf(tf::Tf) = Tf(a=tf.a, θ=tf.θ, c=tf.c)
     function Tf(
         ; a = 1.0 # scaling param
         , θ = 0.0 # [radian]
+        , c = Nothing
     )
         if typeof(a) <: Real  a = [a, a]
         end
-        return new(a, θ)
+        return new(a, θ, c)
     end
 end
 export Tf
@@ -180,15 +242,15 @@ end
 
 
 
-#=
-Geometry(Abstract type)
-=#
+"""
+AbstractType Geometry
+"""
 abstract type Geometry end
 
 
 
 """
-# Lineオブジェクト \\
+# Line \\
 ## howtouse \\
 line = Line(v = [100, 50]) \\
 line2 = Tf(a=[1, 1.5]) * line \\
@@ -227,11 +289,11 @@ export draw, draw_at
 
 
 
-#=
-Circle
-円、楕円、ドーナツオブジェクト
-circle = Circle(r=)
-=#
+"""
+# Circle \\
+円、楕円、ドーナツ型オブジェクト \\
+circle = Circle() #半径100の縁を生成 \\
+"""
 mutable struct Circle <: Geometry
     r::AbstractArray
     r0::AbstractArray
@@ -353,6 +415,74 @@ draw_at(pattern::Pattern, x::AbstractArray; c = RGBA(1, 1, 1, 1)) = draw(pattern
 
 
 
+"""
+# 文字の扱い \\
+font = Font(file="...") \\
+> font.fileを書き換えてもフォントの中身は変化しません \\
+"""
+mutable struct Font
+    file::AbstractString
+    font
+    Font(font::Font) = Font(file=font.file) # あんまり意味ない
+    function Font(
+        ; file = ""
+    )
+        font = ttf_open_font(file) 
+        push!(reserve_close, font)
+        if Int(font) == 0  error("NGE: ttf error can't read a font file") 
+        end
+        return new(file, font)
+    end
+end
+export Font
+
+
+
+"""
+Moji
+文字を扱う。
+"""
+mutable struct Moji
+    str::AbstractString
+    w0::AbstractArray
+    w::AbstractArray
+    c::AbstractRGBA
+    font
+    texture
+    Moji(moji::Moji) = new(moji.str, moji.w0, moji.w, moji.c, moji.font, moji.texture)
+    function Moji(
+          str, font; c = RGBA(1, 1, 1, 1)
+    )
+        surface = ttf_render_UTF8_blanded(font.font, str, c)
+        texture = sdl_create_texture_from_surface(renderer, surface)
+        sdl_free_surface(surface)
+        push!(reserve_destroy, texture)
+        w, h = sdl_query_texture(texture)
+        return new(str, [w, h], [w, h], c, font, texture)
+    end
+end
+export Moji
+Base.copy(moji::Moji) = Moji(moji)
+function Base.:*(tf::Tf, moji::Moji)
+    if tf.c == Nothing
+        new_moji = copy(moji)
+    else 
+        println(tf)
+        new_moji = Moji(moji.str, moji.font, c = tf.c)
+        println(tf.c)
+    end
+    new_moji.w = intround.(tf.a .* new_moji.w)
+    return new_moji
+end
+Base.:*(moji::Moji, tf::Tf) = tf * moji
+function draw(moji::Moji, x::AbstractArray; c = RGBA(1, 1, 1, 1))
+    sdl_render_copy(
+        renderer, moji.texture, 
+        [0, 0], moji.w0, # コピー元
+        x     , moji.w   # コピー先
+    )
+end
+draw_at(moji::Moji, x::AbstractArray; c=RGBA(1, 1, 1, 1)) = draw(moji,  x - moji.w .÷ 2, c=c)
 
 
 
@@ -379,6 +509,7 @@ function beginapp(g::App)
     sdl_init()
     win, renderer = sdl_create_window_and_renderer(g.info.title, g.scene.w)
     event_ref = sdl_event_init()
+    ttf_init()
     sdl_render_clear(renderer)
     sdl_render_present(renderer)
     #=this is main/=#
@@ -395,7 +526,10 @@ function endapp(g::App)
     global section, win, renderer, event_ref, t0, t_old
     # section = [1, 0]
     #=/this is main=#
+    sdl_close.(reserve_close)
+    sdl_destroy.(reserve_destroy)
     sdl_destroy_window_and_renderer(win, renderer)
+    ttf_quit()
     sdl_quit()
 end
 export endapp

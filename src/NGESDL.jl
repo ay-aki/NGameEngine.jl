@@ -161,12 +161,23 @@ function sdl_render_draw_abstract_circle(renderer, x, r0, r1, θ)
 end
 export sdl_render_draw_abstract_circle
 # 
-function sdl_render_copy(renderer, texture, rect)
+function sdl_render_copy(renderer, texture, rect::SDL_Rect, drect::SDL_Rect)
+    ref_rect  = Ref(rect)
+    ref_drect = Ref(drect)
+    SDL_RenderCopy(renderer, texture, ref_rect, ref_drect)
+    return ref_drect[]
+end
+function sdl_render_copy(renderer, texture, x1::AbstractArray, w1::AbstractArray, x2::AbstractArray, w2::AbstractArray)
+    rect  = SDL_Rect(x1[1], x1[2], w1[1], w1[2])
+    drect = SDL_Rect(x2[1], x2[2], w2[1], w2[2])
+    return sdl_render_copy(renderer, texture, rect, drect)
+end
+function sdl_render_copy(renderer, texture, rect::SDL_Rect)
     dest_ref = Ref(rect) # rect = SDL_Rect(x, y, w, h))
     SDL_RenderCopy(renderer, texture, C_NULL, dest_ref)
     return dest_ref[]
 end
-function sdl_render_copy(renderer, texture, x, w)
+function sdl_render_copy(renderer, texture, x::AbstractArray, w::AbstractArray)
     rect = SDL_Rect(x[1], x[2], w[1], w[2])
     return sdl_render_copy(renderer, texture, rect)
 end
@@ -245,6 +256,36 @@ end
 export sdl_mousebutton_is
 sdl_delay = SDL_Delay
 export sdl_delay
+sdl_destroy(texture::Ptr{SDL_Texture}) = SDL_DestroyTexture(texture)
+export sdl_destroy
+
+#=
+TTF functions
+=#
+ttf_init() = TTF_Init()
+export ttf_init
+ttf_quit() = TTF_Quit()
+export ttf_quit
+ttf_open_font(file) = TTF_OpenFont(file, 40)
+export ttf_open_font
+ttf_close_font(font) = TTF_CloseFont(font)
+export ttf_close_font
+sdl_close(font::Ptr{TTF_Font}) = ttf_close_font(font)
+export sdl_close
+ttf_render_UTF8_blanded(font, str, v::AbstractArray) = TTF_RenderUTF8_Blended(
+    font, str, 
+    SDL_Color(
+        UInt8(round(v[1])), UInt8(round(v[2])), 
+        UInt8(round(v[3])), UInt8(round(v[4]))
+    )
+)
+ttf_render_UTF8_blanded(font, str, c::AbstractRGBA) = ttf_render_UTF8_blanded(
+    font, str, 
+    [c.r*255, c.g*255, c.b*255, c.alpha*255]
+)
+export ttf_render_UTF8_blanded
+
+
 
 end
 
