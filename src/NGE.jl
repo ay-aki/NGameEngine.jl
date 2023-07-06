@@ -182,7 +182,6 @@ end
 # Grid \\
 32*32のサイズのgridを作り、gridの配置を20*15で構築する \\
 gr = Grid(w = [32, 32], x = [20, 15]) \\
-Gridそのものを動かすことは余り
 """
 mutable struct Grid
     w::AbstractArray  # gridwidth
@@ -194,7 +193,6 @@ mutable struct Grid
         ; w  = [ 32,  32]
         , x  = [ 20,  15]
         , wx = [640, 480]
-        , ofs= [  0,   0]
     )
         w, x, wx = grid_adjust_w_x_wx(w, x, wx)
         pos = grid_make_pos(w, x)
@@ -202,7 +200,10 @@ mutable struct Grid
     end
 end
 export Grid
-function draw(gr::Grid, x::AbstractArray; c=RGBA(1, 1, 1, 1)) # x = girdの右上座標 draw_atは未定義
+function draw(
+      gr::Grid, x::AbstractArray
+    ; c=RGBA(1, 1, 1, 1)
+)
     color_r = sdl_get_render_draw_color(renderer)
     sdl_set_render_draw_color(renderer, c)    
     n, m = gr.x
@@ -214,6 +215,8 @@ function draw(gr::Grid, x::AbstractArray; c=RGBA(1, 1, 1, 1)) # x = girdの右�
     sdl_set_render_draw_color(renderer, color_r)
 end
 export draw
+
+
 
 
 
@@ -614,6 +617,8 @@ function update!(g::App)
     end
     g.system.mouse.lbutton.down = false
     g.system.mouse.rbutton.down = false
+    g.system.mouse.wheel.is_wheeled = false
+    g.system.mouse.wheel.dx = [0, 0]
     events = sdl_poll_events(event_ref)
     for e in events
         if     sdl_event_is(e, :SDL_QUIT)
@@ -643,7 +648,7 @@ function update!(g::App)
                 g.system.mouse.rbutton.up = true
             end
         elseif sdl_event_is(e, :SDL_MOUSEWHEEL)
-            g.system.mouse.wheel.dx = [e.wheel.x, e.wheel.y]
+            g.system.mouse.wheel.dx = [Int(e.wheel.x), Int(e.wheel.y)]
             g.system.mouse.wheel.is_wheeled = true
         end
     end

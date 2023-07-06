@@ -85,15 +85,26 @@ function app_3()
     gr  = Grid()
     # 画像を読み出す(サイズを0.1倍)
     img = Tf(a=0.1) * Image("..\\assets\\img_files\\sample0.png")
-    # 15個くらいランダムに散らせる画像
+    # 15個ランダムに画像を散らす
     ipos= [gr.pos[rand(1:gr.x[1]), rand(1:gr.x[2])] for i = 1:15]
-    # マウスで設置する画像
+    # マウスで画像を設置する
     lpos= []
     while update!(g)
         draw(c=RGBA(1, 1, 1, 1))
         draw(gr, [0, 0], c=RGBA(1, 0, 0, 1))
+        # draw((gr, g.system.mouse.x))
+        #collide(
+        #    (Rectangle(w=gr.w), x), 
+        #    ([1,1], g.system.mouse.x)
+        #)
+        
         draw(img, g.system.mouse.x)
         if g.system.mouse.lbutton.down  push!(lpos, g.system.mouse.x)
+        end
+        if g.system.mouse.wheel.is_wheeled == true
+            if     g.system.mouse.wheel.dx[2] > 0  img = Tf(a=1.1) * img
+            elseif g.system.mouse.wheel.dx[2] < 0  img = Tf(a=0.9) * img
+            end
         end
         (x -> draw(img, x)).(ipos)
         (x -> draw(img, x)).(lpos)
