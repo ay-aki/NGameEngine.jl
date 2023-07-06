@@ -6,12 +6,23 @@ using SimpleDirectMediaLayer.LibSDL2
 using Colors
 using LinearAlgebra
 
-intround = (x -> Int(round(x)))
-intfloor = (x -> Int(floor(x)))
-intceil  = (x -> Int(ceil(x)))
+
+
+#=
+...
+=#
+intround      = (x -> Int(round(x)))
+intfloor      = (x -> Int(floor(x)))
+intceil       = (x -> Int(ceil(x)))
+uint8round    = (x -> UInt8(round(x)))
+uint8round255 = (x -> UInt8(round(x*255)))
 rot_2d_matrix(θ::Real) = [cos(θ) -sin(θ); sin(θ) cos(θ)]
 
-# 
+
+
+#=
+Core functions
+=#
 function sdl_init()
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 16)
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16)
@@ -53,7 +64,12 @@ function sdl_poll_events(event)
     return evts
 end
 export sdl_poll_events
-# 
+
+
+
+#=
+draw functions
+=# 
 sdl_set_render_draw_color(renderer, c::AbstractRGBA) = SDL_SetRenderDrawColor(renderer, UInt8(round(c.r*255)), UInt8(round(c.g*255)), UInt8(round(c.b*255)), UInt8(round(c.alpha*255)))
 sdl_set_render_draw_color(renderer, v::AbstractArray) = SDL_SetRenderDrawColor(renderer, UInt8(round(v[1])), UInt8(round(v[2])), UInt8(round(v[3])), UInt8(round(v[4])))
 export sdl_set_render_draw_color
@@ -192,19 +208,42 @@ function sdl_destroy_window_and_renderer(win, renderer)
     SDL_DestroyWindow(win)
 end
 export sdl_destroy_window_and_renderer
-#
+# 
 img_load(file) = IMG_Load(file)
 sdl_create_texture_from_surface(renderer, surface) = SDL_CreateTextureFromSurface(renderer, surface)
+"""
+テクスチャを開放
+"""
 sdl_free_surface(surface) = SDL_FreeSurface(surface)
 export img_load, sdl_create_texture_from_surface, sdl_free_surface
-# 
+"""
+テクスチャのサイズを得る
+"""
 function sdl_query_texture(texture)
     w_ref, h_ref = Ref{Cint}(0), Ref{Cint}(0)
     SDL_QueryTexture(texture, C_NULL, C_NULL, w_ref, h_ref)
     return w_ref[], h_ref[]
 end
 export sdl_query_texture
-# 
+"""
+ウインドウからサーフェスを生成 \\
+surface = sdl_get_window_surface(window)
+"""
+sdl_get_window_surface(window) = SDL_GetWindowSurface(window)
+export sdl_get_window_surface
+"""
+sdl_map_rgba(surface.format, [255, 0, 0, 255]) \\
+sdl_map_rgba(surface.format, RGBA(255, 0, 0, 255)) \\
+"""
+sdl_map_rgba(format, v::AbstractArray) = SDL_MapRGBA(format,  uint8round(v[1]), uint8round(v[2]), uint8round(v[3]), uint8round(v[4]))
+sdl_map_rgba(format, c::AbstractRGBA) = SDL_MapRGBA(format, uint8round255(c.r), uint8round255(c.g), uint8round255(c.b), uint8round255(c.alpha))
+export sdl_map_rgba
+
+
+
+#=
+Core functions 2
+=#
 function sdl_get_window_size(win)
     w, h = Int32[0],Int32[0]
     SDL_GetWindowSize(win, w, h)
@@ -258,6 +297,8 @@ sdl_delay = SDL_Delay
 export sdl_delay
 sdl_destroy(texture::Ptr{SDL_Texture}) = SDL_DestroyTexture(texture)
 export sdl_destroy
+
+
 
 #=
 TTF functions

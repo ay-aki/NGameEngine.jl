@@ -16,15 +16,12 @@ reserve_destroy = [] # destroy all
 # this_directory = dirname(this_file)
 
 #= 
+activate ..
+
+
 設計指向
-> Siv3dを参考にしたい。
+> 文法の設計指向はSiv3dを参考にしたい。
 > juliaの文法を生かせるようにしたい。
-> gr = grid([20, 15])みたいにして、gr.pos[4, 5] を指定して描写する
-> draw(, gr.pos[4, 5])
-> 0.1 * rectとかすることでスケールできるようにしたい。
-> [0.1. 0.5] * rectで横縦をスケールできるようにしたい。
-> π ^ rect で回転させたい
-> 
 
 命名規則
 > v, w, x, y, zは位置や直線などのベクトルを表す
@@ -56,19 +53,27 @@ mutable struct Scene
 end
 export Scene
 
+mutable struct Wheel
+    dx::AbstractArray
+    is_wheeled::Bool
+    Wheel(dx, is_wheeled) = new(dx, is_wheeled)
+    Wheel() = Wheel([0, 0], false)
+end
+
 mutable struct Button
     down::Bool
     up::Bool
     Button(down, up) = new(down, up)
-    Button() = new(false, false)
+    Button() = Button(false, false)
 end
 
 mutable struct Mouse
     x::AbstractArray
     lbutton::Button
     rbutton::Button
-    Mouse(x, lbutton, rbutton) = new(x, lbutton, rbutton)
-    Mouse() = Mouse([-1, -1], Button(), Button())
+    wheel::Wheel
+    Mouse(x, lbutton, rbutton, wheel) = new(x, lbutton, rbutton, wheel)
+    Mouse() = Mouse([-1, -1], Button(), Button(), Wheel())
 end
 export Mouse
 
@@ -171,6 +176,8 @@ function grid_make_from_ofs(ofs, wx)
     )
 end
 
+
+
 """
 # Grid \\
 32*32のサイズのgridを作り、gridの配置を20*15で構築する \\
@@ -219,15 +226,17 @@ mutable struct Tf
     a::AbstractArray
     θ::Real
     c::Union{AbstractRGBA, DataType}
-    Tf(tf::Tf) = Tf(a=tf.a, θ=tf.θ, c=tf.c)
+    w::Union{AbstractArray, DataType}
+    Tf(tf::Tf) = Tf(a=tf.a, θ=tf.θ, c=tf.c, w=tf.w)
     function Tf(
         ; a = 1.0 # scaling param
         , θ = 0.0 # [radian]
         , c = Nothing
+        , w = Nothing # resize param
     )
         if typeof(a) <: Real  a = [a, a]
         end
-        return new(a, θ, c)
+        return new(a, θ, c, w)
     end
 end
 export Tf
@@ -238,7 +247,6 @@ function Base.:*(tf1::Tf, tf2::Tf)
         θ = tf1.θ + tf2.θ
     )
 end
-
 
 
 
@@ -328,9 +336,9 @@ draw_at(circle::Circle, x::AbstractArray; c = RGBA(1, 1, 1, 1)) = draw(circle, x
 
 
 
-#=
+"""
 Rectangle
-=#
+"""
 mutable struct Rectangle <: Geometry
     w::AbstractArray
     lw::Real
@@ -365,15 +373,15 @@ draw_at(rect::Rectangle, x::AbstractArray; c = RGBA(1, 1, 1, 1)) = draw(rect, x 
 
 
 
-#=
+"""
 Pattern
-以下のようにすると凹のような図形になります。
+以下のようにすると30*30の凹のような図形になります。
 pat = 10 * Pattern([
     true false true;
     true false true;
     true true  true
 ])
-=#
+"""
 mutable struct Pattern <: Geometry
     X::Matrix{Bool}
     Pattern(pat::Pattern) = Pattern(X=pat.X)
@@ -486,9 +494,47 @@ draw_at(moji::Moji, x::AbstractArray; c=RGBA(1, 1, 1, 1)) = draw(moji,  x - moji
 
 
 
-#=
-ゲーム設定
-=#
+"""
+Image
+画像を扱う
+"""
+mutable struct Image
+    file::AbstractString
+    w0::AbstractArray
+    w::AbstractArray
+    texture
+    Image(img::Image) = new(img.file, img.w0, img.w, img.texture)
+    function Image(file::AbstractString)
+        surface = img_load(file)
+        texture = sdl_create_texture_from_surface(renderer, surface)
+        sdl_free_surface(surface)
+        push!(reserve_destroy, texture)
+        w, h = sdl_query_texture(texture)
+        return new(file, [w, h], [w, h], texture)
+    end
+end
+export Image
+Base.copy(img::Image) = Image(img)
+function Base.:*(tf::Tf, img::Image)
+    new_img = copy(img)
+    new_img.w = intround.(tf.a .* img.w)
+    return new_img
+end
+Base.:*(img::Image, tf::Tf) = tf * img
+function draw(img::Image, x::AbstractArray)
+    sdl_render_copy(
+        renderer, img.texture, 
+        [0, 0], img.w0, # コピー元
+        x     , img.w   # コピー先
+    )
+end
+draw_at(img::Image, x::AbstractArray) = draw(img,  x - img.w .÷ 2)
+
+
+
+
+
+
 """
 キーボードキー登録
 """
@@ -499,6 +545,7 @@ function register_keys!(g::App, ss)
     end
 end
 export register_keys!
+
 
 
 """
@@ -519,6 +566,7 @@ end
 export beginapp
 
 
+
 """
 ゲーム終了関数
 """
@@ -535,6 +583,7 @@ end
 export endapp
 
 
+
 """
 ゲーム実行関数
 """
@@ -545,6 +594,7 @@ function runapp(g::App)
     endapp(g)
 end
 export runapp
+
 
 
 """
@@ -592,17 +642,16 @@ function update!(g::App)
             elseif sdl_mousebutton_is(e, :SDL_BUTTON_RIGHT)
                 g.system.mouse.rbutton.up = true
             end
+        elseif sdl_event_is(e, :SDL_MOUSEWHEEL)
+            g.system.mouse.wheel.dx = [e.wheel.x, e.wheel.y]
+            g.system.mouse.wheel.is_wheeled = true
         end
     end
     g.system.mouse.x = sdl_mouse_position()
-    
-    #=
-    if true in sdl_event_is_quit.(events)
-        return false
-    end=#
     return true
 end
 export update!
+
 
 
 """
