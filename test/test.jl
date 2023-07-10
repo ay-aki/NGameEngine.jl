@@ -86,38 +86,71 @@ function app_3()
     # 画像を読み出す(サイズを0.1倍)
     img = Tf(a=0.1) * Image("..\\assets\\img_files\\sample0.png")
     # 15個ランダムに画像を散らす
-    ipos= [gr.pos[rand(1:gr.x[1]), rand(1:gr.x[2])] for i = 1:15]
+    ipos= [
+        gr[rand(1:gr.x[1]), rand(1:gr.x[2])].lm
+        for i = 1:15
+    ]
     # マウスで画像を設置する
     lpos= []
+    # マウスの位置に表示する画像
+    img_tf = img
+    # 画像の拡大率
+    a = [1.0, 1.0]
     while update!(g)
+        # 背景色を白とする
         draw(c=RGBA(1, 1, 1, 1))
+        # グリッドを表示する
         draw(gr, [0, 0], c=RGBA(1, 0, 0, 1))
-        # draw((gr, g.system.mouse.x))
-        #collide(
-        #    (Rectangle(w=gr.w), x), 
-        #    ([1,1], g.system.mouse.x)
-        #)
-        
-        draw(img, g.system.mouse.x)
-        if g.system.mouse.lbutton.down  push!(lpos, g.system.mouse.x)
+        # マウスの位置がlower-middleになるときの描写用座標
+        x_mouse = g.system.mouse.x
+        # マウスの場所に画像を表示する
+        if g.system.mouse.lbutton.down  push!(lpos, x_mouse)
         end
         if g.system.mouse.wheel.is_wheeled == true
-            if     g.system.mouse.wheel.dx[2] > 0  img = Tf(a=1.1) * img
-            elseif g.system.mouse.wheel.dx[2] < 0  img = Tf(a=0.9) * img
+            if     g.system.mouse.wheel.dx[2] > 0  a = 1.1 * a
+            elseif g.system.mouse.wheel.dx[2] < 0  a = 0.9 * a
             end
         end
-        (x -> draw(img, x)).(ipos)
-        (x -> draw(img, x)).(lpos)
+        img_tf = Tf(a=a) * img
+        draw(img_tf, Boundary(img_tf.w, lm=x_mouse).ul)
+        (x -> draw(img_tf, x)).((x -> Boundary(img_tf.w, lm = x).ul).(ipos))
+        (x -> draw(img_tf, x)).((x -> Boundary(img_tf.w, lm = x).ul).(lpos))
+        sleep(0.01)
+    end
+end
+
+
+function app_4()
+    gr   = Grid()
+    img  = Tf(a=0.1) * Image("..\\assets\\img_files\\sample1.png")
+    gr2  = Grid(w=img.w0 .÷ [12, 3], x=[12, 3])
+    imgs = (x -> cut_texture(img, x)).(gr2)
+    (x -> resize_texture!(x, [32, 32])).(imgs)
+
+    while update!(g)
+        draw()
+        draw(gr, [0, 0])
+        draw(imgs[9, 1], gr[5, 7].ul)
+        sleep(0.1)
+    end
+end
+
+
+
+function app_5()
+    circ = Circle(r=200)
+    while update!(g)
+        draw(circ, g.system.mouse.x, pin = :mm)
         sleep(0.01)
     end
 end
 
 
 
-
-g.main = app_3
+g.main = app_5
 
 runapp(g)
+
 
 
 

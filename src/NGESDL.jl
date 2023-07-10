@@ -102,7 +102,7 @@ export sdl_render_draw_rect
 function sdl_render_draw_abstract_line(renderer, x, lv, lw, θ)
     lv = rot_2d_matrix(θ::Real) * lv
     if     lw == 1
-        sdl_render_draw_line(renderer, x, lv)
+        sdl_render_draw_line(renderer, x, x+lv)
     elseif lw >  1
         nv  = [+1, -1] .* lv
         nve = nv / max(nv[1], nv[2])
@@ -209,6 +209,10 @@ function sdl_destroy_window_and_renderer(win, renderer)
 end
 export sdl_destroy_window_and_renderer
 # 
+sdl_destroy(renderer::Ptr{SDL_Renderer}) = SDL_DestroyRenderer(renderer)
+sdl_destroy(win::Ptr{SDL_Window}) = SDL_DestroyWindow(win)
+export sdl_destroy
+# 
 img_load(file) = IMG_Load(file)
 sdl_create_texture_from_surface(renderer, surface) = SDL_CreateTextureFromSurface(renderer, surface)
 """
@@ -312,6 +316,7 @@ export ttf_open_font
 ttf_close_font(font) = TTF_CloseFont(font)
 export ttf_close_font
 sdl_close(font::Ptr{TTF_Font}) = ttf_close_font(font)
+sdl_destroy(font::Ptr{TTF_Font}) = ttf_close_font(font)
 export sdl_close
 ttf_render_UTF8_blanded(font, str, v::AbstractArray) = TTF_RenderUTF8_Blended(
     font, str, 
