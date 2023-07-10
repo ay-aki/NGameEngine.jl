@@ -13,6 +13,16 @@ register_keys!(g, [:w, :s, :a, :d, :↑, :↓, :←, :→])
 
 
 
+"""
+何もしないプログラム
+"""
+function app_0()
+    ; # 何らかの初期化処理
+    while update!(g)
+        ; # 何らかのループ処理
+    end
+end
+
 
 
 """
@@ -129,7 +139,7 @@ function app_4()
 
     while update!(g)
         draw()
-        draw(gr, [0, 0])
+        draw(gr[2:8, 3:7], [0, 0])
         draw(imgs[9, 1], gr[5, 7].ul)
         sleep(0.1)
     end
@@ -137,17 +147,100 @@ end
 
 
 
+"""
+接触判定のサンプル
+"""
 function app_5()
-    circ = Circle(r=200)
+    rect0 = Rectangle(w = [100, 100])
+    rect  = Rectangle(w = [20, 40])
     while update!(g)
-        draw(circ, g.system.mouse.x, pin = :mm)
+        # g.scene.centerが中心(middle-middle)となるようにしたrect0の領域
+        bd0 = Boundary(rect0.w, mm = g.scene.center)
+        # xが左上(upper-left)になるようにしたrectの領域
+        bd  = Boundary(rect.w, ul = g.system.mouse.x)
+        its = Intersects(bd, bd0)
+        if any(its)
+            if its.top    == true  print("top")    end
+            if its.buttom == true  print("buttom") end
+            if its.left   == true  print("left")   end
+            if its.right  == true  print("right")  end
+            if its.bounded== true  print("bounded")end
+            if its.bounds == true  print("bounds") end
+            println()
+        end
+        draw(rect0, bd0.ul)
+        draw(rect, bd.ul)
         sleep(0.01)
     end
 end
 
 
 
-g.main = app_5
+function app_6()
+    img  = Image("..\\assets\\img_files\\sample2.png")
+    imgs = cut_texture(img, [6, 2])
+    x  = g.scene.center
+    i, j = 0, 0
+    flag = false
+    while update!(g)
+        draw(c = RGBA(1, 1, 1, 1))
+        flag |= g.scene.timing[0.1]
+        if     g.system.keyboard.scans[:a].down
+            x += [-10, 0]
+            if flag
+                i  = (i + 1) % 3
+                j  = 0
+                flag = false
+            end
+        elseif g.system.keyboard.scans[:d].down
+            x += [10, 0]
+            if flag
+                i  = 3 + (i + 1) % 3
+                j  = 0
+                flag = false
+            end
+        elseif g.system.keyboard.scans[:w].down
+            x += [0, -10]
+            if flag
+                i  = (i + 1) % 3
+                j  = 1
+                flag = false
+            end
+        elseif g.system.keyboard.scans[:s].down
+            x += [0, 10]
+            if flag
+                i  = 3 + (i + 1) % 3
+                j  = 1
+                flag = false
+            end
+        end
+        draw(Tf(a=0.2) * imgs[i+1, j+1], x)
+        sleep(0.01)
+    end
+end
+
+
+function app_7()
+    line    = Line(vector = [30, 50]) # 線
+    circle  = Circle(r = 20) # 円
+    donut   = Circle(r = 20, r0 = 10) # ドーナツ型
+    ellipse = Circle(r = [50, 60]) # 楕円
+    rect    = Rectangle(w = [40, 20])
+    pat     = Tf(a = 10) * Pattern(X = [true false; true true])
+    while update!(g)
+        draw(line, [10, 10])
+        draw(circle, [100, 50])
+        draw(donut, [100, 100])
+        draw(ellipse, [100, 150])
+        draw(rect, [200, 50])
+        draw(pat, [200, 100])
+        sleep(0.01)
+    end
+end
+
+
+
+g.main = app_7
 
 runapp(g)
 
@@ -185,11 +278,16 @@ endapp(g) # 後処理など
 ブロック崩し
 
 function app()
-    ball_speed = [0, -480]
-    ball = Circle(r = 8)
-    bricks = Grid(w = [32, 8], wx=[640, 480])
+    ball_speed = [0, -240]
+    ball, x_ball = Circle(r = 8), [200, 200]
+    brick = 
+    bricks = Grid(w = [40, 20], x = [16, 4]) # 座標として使う
+    paddle = Rectangle(w = [60, 10])
     while update!(g)
-        collide(bricks, ball, option=:any)
+        bd_ball = Boundary(2*ball.r, x_ball)
+        
+        Intersects(bd_ball, grid)
+        sleep(0.01)
     end
 end
 =#

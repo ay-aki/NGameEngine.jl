@@ -41,6 +41,12 @@ end
 # Boundary
 例えば、右上座標が[0, 0]でサイズが[50, 50]で与える四角形領域の中央座標を得るには
 `bd = Boundary(w=[50, 50], ur=[0, 0]); bd.mm`とする。
+
+以下のように、それぞれの領域が定められているものと考えてください。\\
+[ul um ur; = [左上 中上 右上; \\
+ ml mm mr;    左中 中中 右中; \\
+ ll lm lr]    左下 中下 右下] \\
+
 """
 struct Boundary
     w::AbstractArray  # 幅と高さ
@@ -53,7 +59,8 @@ struct Boundary
     ll::AbstractArray
     lm::AbstractArray
     lr::AbstractArray
-    function Boundary(w; lwargs...)
+    # Boundary(rect::Rectangle; lwargs...) = Boundary(rect.w, lwargs...)
+    function Boundary(w::AbstractArray; lwargs...)
         key_list = keys(lwargs)
         # upperleft, ...
         if     :ul in key_list  ul = lwargs[:ul]
@@ -81,18 +88,48 @@ struct Boundary
 end
 export Boundary
 
-function intersects(
-      bd1::Boundary
-    , bd2::Boundary
-)
-    bd1
-end
-export intersect
 
-#= 
-(x + img)::Boundaryのように書けるようにしたい
-intersects(x + img, gr[1,1])
-=#
+
+
+function each_intersects(obj::Boundary, v::AbstractArray)
+    left, upper = obj.ul .< v
+    right,lower = v .< obj.lr
+    return [left & upper  right & upper; 
+            left & lower  right & lower]
+end
+function map_intersects(obj::Boundary, bd::Boundary)
+    ret = ones(Bool, 3, 3)
+    ret[1:2, 1:2] .&= each_intersects(obj, bd.ul)
+    ret[1:2, 2:3] .&= each_intersects(obj, bd.ur)
+    ret[2:3, 1:2] .&= each_intersects(obj, bd.ll)
+    ret[2:3, 2:3] .&= each_intersects(obj, bd.lr)
+    return ret
+end
+"""
+# Intersects
+"""
+struct Intersects
+    top::Bool     # 上がbdに触れている
+    buttom::Bool  # 下が...
+    left::Bool    # 左が...
+    right::Bool   # 右が...
+    bounded::Bool # bd内部に含まれている
+    bounds::Bool  # obj内部にbdを含む
+    Intersects(obj::Boundary, bd::Boundary) = begin
+        t = map_intersects(obj, bd)
+        top     = all(t[1:2, 2])
+        buttom  = all(t[2:3, 2])
+        left    = all(t[2, 1:2])
+        right   = all(t[2, 2:3])
+        bounded = (t[2,2] == true) & (sum(t) == 1)
+        bounds  = all(t)
+        return new(top, buttom, left, right, bounded, bounds)
+    end
+end
+export Intersects
+Base.any(its::Intersects) = its.top | its.buttom | its.left | its.right | its.bounded | its.bounds
+
+
 
 
 
@@ -136,6 +173,7 @@ mutable struct Grid
     ofs::AbstractArray
     bd::Matrix{Boundary} # pos::AbstractArray
     Grid(gr::Grid) = new(gr.w, gr.x, gr.ofs, gr.bd)
+    Grid(w, x, ofs, bd) = new(w, x, ofs, bd)
     function Grid(
         ; w  = [ 32,  32]
         , x  = [ 20,  15]
@@ -163,7 +201,15 @@ function draw(
     sdl_set_render_draw_color(renderer, color_r)
 end
 export draw
-Base.getindex(gr::Grid, i::Union{Int, AbstractVector{Int64}}, j::Union{Int, AbstractVector{Int64}}) = gr.bd[i, j] # Type Boundary
+# Base.getindex(gr::Grid, i::Union{Int, AbstractVector{Int64}}, j::Union{Int, AbstractVector{Int64}}) = gr.bd[i, j] # Type Boundary
+Base.getindex(gr::Grid, i::Int, j::Int) = gr.bd[i, j]
+function Base.getindex(gr::Grid, ii::AbstractVector{Int64}, jj::AbstractVector{Int64})
+    w   = gr.w
+    x   = length.([ii, jj])
+    ofs = gr.ofs + w .* ([ii[1], jj[1]] .- 1)
+    bd  = gr.bd[ii, jj]
+    return Grid(w, x, ofs, bd)
+end
 function Base.collect(gr::Grid)
     A = fill(gr[1, 1], Tuple(gr.x))
     for i = 1:gr.x[1] for j = 1:gr.x[2]
@@ -281,7 +327,7 @@ mutable struct Circle <: Geometry
     Circle(circle::Circle) = Circle(r0=circle.r0, r=circle.r, θ=circle.θ)
     function Circle(
         ; r  = 100
-        , r0 = 0
+        , r0 = r
         , θ  = 0 
     )
         if typeof(r)  <: Real  r  = [r, r]
@@ -346,15 +392,20 @@ export Rectangle
 Base.copy(rect::Rectangle) = Rectangle(rect)
 function Base.:*(tf::Tf, rect::Rectangle)
     new_rect = copy(rect)
-    new_rect.w = tf.a .* new_rect
+    new_rect.w = tf.a .* rect.w
     return new_rect
 end
 Base.:*(rect::Rectangle, tf::Tf) = tf * rect
-function draw(rect::Rectangle, x::AbstractArray; c = RGBA(1, 1, 1, 1))
-    global renderer
+function draw(
+      rect::Rectangle, x::AbstractArray
+    ; c         = RGBA(1, 1, 1, 1)
+    , linewidth = 1
+    , pin       = :ul
+)
     color_r = sdl_get_render_draw_color(renderer)
     sdl_set_render_draw_color(renderer, c)
-    sdl_render_draw_abstract_rect(renderer, x, rect.w, rect.lw, rect.is_filled)
+    if pin != :ul  x = s_and_w_to_ul(pin, x, rect.w) end
+    sdl_render_draw_abstract_rect(renderer, x, rect.w, linewidth, rect.is_filled)
     sdl_set_render_draw_color(renderer, color_r)
 end
 draw_at(rect::Rectangle, x::AbstractArray; c = RGBA(1, 1, 1, 1)) = draw(rect, x + intround.(rect.w / 2), c=c)
@@ -574,8 +625,18 @@ function cut_texture(tex::Texture, bd::Boundary)
     new_tex.w    = bd.w
     return new_tex
 end
-
+cut_texture(tex::Texture, gr::Grid) = (x -> cut_texture(tex, x)).(gr)
+function cut_texture(tex::Texture, x::AbstractArray, require_grid = false) 
+    gr = Grid(w=tex.w0 .÷ x, x = x)
+    newtex = cut_texture(tex, gr)
+    if require_grid return newtex, gr
+    else            return newtex
+    end
+end
 export cut_texture
+
+
+
 
 
 

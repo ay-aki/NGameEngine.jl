@@ -22,12 +22,28 @@ mutable struct Info
 end
 export Info
 
+mutable struct Timing
+    keys
+    timers
+    timings # Bool
+    Timing() = new([], Dict(), Dict())
+end
+function Base.getindex(ti::Timing, dt::Real)
+    if !(dt in ti.keys)
+        push!(ti.keys, dt)
+        ti.timers[dt]  = 0.0
+        ti.timings[dt] = false
+    end
+    return ti.timings[dt]
+end
+
 mutable struct Scene
     w::AbstractArray # ウインドウサイズ
     center::AbstractArray
     t
     dt
-    Scene(w, t, dt)  = new(w, w / 2.0, t, dt)
+    timing::Timing
+    Scene(w, t, dt)  = new(w, w / 2.0, t, dt, Timing())
     Scene() = Scene([640, 480], 0.0, 0.0)
 end
 export Scene
@@ -82,7 +98,9 @@ export System
 `g.scene.t` で現在時間を取得 \\
 `g.scene.dt` で前フレームとの時間差を取得 \\
 `g.system.keyboard.scans[:w].down` でキーボードのwが押されたかを取得 \\
-※ただし、`register_keys!(g, [..., :w, ...])` が実行されている必要がある。 
+※ただし、`register_keys!(g, [..., :w, ...])` が実行されている必要がある。 \\
+`g.scene.timing[0.5]`は0.5秒ごとにtrueになるタイミングを与える。 \\
+
 """
 mutable struct App
     info::Info
@@ -173,6 +191,13 @@ function update!(g::App)
     g.scene.dt = t - t_old
     t_old = time()
     g.scene.t = t - t0
+    for key = g.scene.timing.keys
+        g.scene.timing.timings[key] = false
+        if t - g.scene.timing.timers[key] > key
+            g.scene.timing.timings[key] = true
+            g.scene.timing.timers[key] = t
+        end
+    end
     for s = g.system.keyboard.keys
         g.system.keyboard.scans[s].down = false
         g.system.keyboard.scans[s].up = false
