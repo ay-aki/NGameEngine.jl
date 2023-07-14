@@ -14,7 +14,7 @@ register_keys!(g, [:w, :s, :a, :d, :↑, :↓, :←, :→])
 
 
 """
-何もしないプログラム
+do nothing
 """
 function app_0()
     ; # 何らかの初期化処理
@@ -30,18 +30,18 @@ end
 """
 function app_1()
     # 線の生成
-    line = Line(v = [200, 100], lw = 4)
+    line = Line_old(v = [200, 100], lw = 4)
     # 円の生成
-    circle  = Circle(r0 = [10, 50])
-    circle2 = Circle(r0 = [10, 50])
+    circle  = Circle_old(r0 = [10, 50])
+    circle2 = Circle_old(r0 = [10, 50])
     # パターンの生成
-    pat = Tf(a=10) * Pattern(
+    pat = Tf(a=10) * Pattern_old(
         X = [true false true; 
              true false true;  
              true true  true]
     )
     # 長方形の生成
-    rect = Rectangle(w = [100, 200]) # [100, 200], RGBA(0, 0, 1, 1)
+    rect = Rectangle_old(w = [100, 200]) # [100, 200], RGBA(0, 0, 1, 1)
     # 画面中央座標
     x_me = g.scene.center
     while update!(g)
@@ -71,7 +71,7 @@ end
 フォントに関するサンプル
 """
 function app_2()
-    line = Line(v = [200, 100], lw = 4)
+    line = Line_old(v = [200, 100], lw = 4)
     font = Font(file = "..\\assets\\ttf_files\\Noto_Sans_JP\\NotoSansJP-VariableFont_wght.ttf")
     str1 = Moji("Hello_World!", font)
     str1 = Tf(a=1.5) * str1
@@ -92,7 +92,7 @@ end
 """
 function app_3()
     # グリッドを作る
-    gr  = Grid()
+    gr  = Grid_old()
     # 画像を読み出す(サイズを0.1倍)
     img = Tf(a=0.1) * Image("..\\assets\\img_files\\sample0.png")
     # 15個ランダムに画像を散らす
@@ -131,9 +131,9 @@ end
 
 
 function app_4()
-    gr   = Grid()
+    gr   = Grid_old()
     img  = Tf(a=0.1) * Image("..\\assets\\img_files\\sample1.png")
-    gr2  = Grid(w=img.w0 .÷ [12, 3], x=[12, 3])
+    gr2  = Grid_old(w=img.w0 .÷ [12, 3], x=[12, 3])
     imgs = (x -> cut_texture(img, x)).(gr2)
     (x -> resize_texture!(x, [32, 32])).(imgs)
 
@@ -151,14 +151,14 @@ end
 接触判定のサンプル
 """
 function app_5()
-    rect0 = Rectangle(w = [100, 100])
-    rect  = Rectangle(w = [20, 40])
+    rect0 = Rectangle_old(w = [100, 100])
+    rect  = Rectangle_old(w = [20, 40])
     while update!(g)
         # g.scene.centerが中心(middle-middle)となるようにしたrect0の領域
         bd0 = Boundary(rect0.w, mm = g.scene.center)
         # xが左上(upper-left)になるようにしたrectの領域
         bd  = Boundary(rect.w, ul = g.system.mouse.x)
-        its = Intersects(bd, bd0)
+        its = Intersects_old(bd, bd0)
         if any(its)
             if its.top    == true  print("top")    end
             if its.buttom == true  print("buttom") end
@@ -220,32 +220,160 @@ function app_6()
 end
 
 
-function app_7()
-    line    = Line(vector = [30, 50]) # 線
-    circle  = Circle(r = 20) # 円
-    donut   = Circle(r = 20, r0 = 10) # ドーナツ型
-    ellipse = Circle(r = [50, 60]) # 楕円
-    rect    = Rectangle(w = [40, 20])
-    pat     = Tf(a = 10) * Pattern(X = [true false; true true])
+
+
+"""
+# SimpleDirectMediaLayer.jlのサンプルっぽいもの
+"""
+function app_8()
+    img = Image(SampleFiles().sdl.assets.cat)
+    cat = Object(img)
+    cat.x = g.scene.center - img.w .÷ 2
+    cat.speed = 300
     while update!(g)
-        draw(line, [10, 10])
-        draw(circle, [100, 50])
-        draw(donut, [100, 100])
-        draw(ellipse, [100, 150])
-        draw(rect, [200, 50])
-        draw(pat, [200, 100])
-        sleep(0.01)
+        if     g.system.keyboard.scans[:w].down | g.system.keyboard.scans[:↑].down
+            cat.x[2] -= cat.speed ÷ 30
+        elseif g.system.keyboard.scans[:a].down | g.system.keyboard.scans[:←].down
+            cat.x[1] -= cat.speed ÷ 30
+        elseif g.system.keyboard.scans[:s].down | g.system.keyboard.scans[:↓].down
+            cat.x[2] += cat.speed ÷ 30
+        elseif g.system.keyboard.scans[:d].down | g.system.keyboard.scans[:→].down
+            cat.x[1] += cat.speed ÷ 30
+        end
+        draw(cat)
+        sleep(1 / 60)
     end
 end
 
 
 
-g.main = app_7
+
+
+
+"""
+# 各種図形等の表示
+"""
+function app_9()
+    nog = EmptyGeom()
+    line = Line()
+    circle = Circle()
+    rect = Rectangle()
+    pat = Pattern(kron([true true; false true], ones(Bool, 10, 10))) # kron of LinearAlgebra
+    hello = Moji("Hello World!") # inplicit loading default font = Font()
+    img1 = Image()
+    scale!(img1, 0.1)
+    img2 = Image(SampleFiles().nge.assets.img_files.sample1)
+    img2s = cut_texture(img2, [12, 3])
+    while update!(g)
+        # 背景色の設定
+        draw(color = RGBA(1, 0, 0, 1)) 
+        # 何もしない
+        draw(nog, [0. 0])
+        # 線の表示
+        draw(line, [0, 0])
+        # 円の表示
+        draw(circle, [0, 0])
+        # 長方形の表示
+        draw(rect, [0, 0])
+        # パターンの表示
+        draw(pat, [100, 100])
+        # 文字の表示
+        draw(hello, [100, 100])
+        # 画像の表示
+        draw(img1, [200, 200])
+        # グリッドで切り取った行列の表示
+        draw(img2s[1, 1], [100, 50])
+    end
+end
+
+
+
+"""
+# ブロック崩し（終了判定などはなし）
+"""
+function app_10()
+    # ボール
+    ball   = Object(Circle(8, 4))
+    ball.x = [320, 200]
+    ball.v = [0, -300]
+    ball.speed = norm(ball.v)
+
+    # 操作オブジェクト
+    paddle = Object(Rectangle([60, 10]))
+
+    # ブロック（Grid）
+    bricks = Grid([40, 20], [16, 5], offset = [0, 20])
+    n, m = size(bricks)
+    for i = 1:n for j = 1:m
+        bricks[i, j] = Object(Rectangle([40, 20]))
+        bricks[i, j].is_valid = true
+    end end
+
+    # 画面オブジェクト
+    scene = Object(g.scene)
+    
+    while update!(g)
+        # 座標の変更
+        paddle.x = [g.system.mouse.x[1], 400]
+        ball.x  += ball.v * g.scene.dt
+        
+        # ブロックにぶつかったらブロックを消滅させ、跳ね返る
+        n, m = size(bricks)
+        for i = 1:n  for j = 1:m
+            it_brick = Intersects(ball, bricks[i, j])
+            if any(it_brick)
+                if (! bricks[i, j].is_valid) continue end
+                if     (it_brick.top & (ball.v[2] > 0)) | (it_brick.bottom & (ball.v[2] < 0))
+                    ball.v[2] *= -1
+                elseif (it_brick.left & (ball.v[1] > 0)) | (it_brick.right & (ball.v[1] < 0))
+                    ball.v[1] *= -1
+                end
+                bricks[i, j].is_valid = false
+                break
+            end
+        end end
+        
+        # 天井にぶつかったらはね返る
+		if (ball.top < scene.top) & (ball.v[2] < 0)
+            ball.v[2] *=-1
+        end
+
+        # 左(右の壁にぶつかったらはね返る
+        if    ((ball.left < scene.left) & (ball.v[1] < 0)) | ((ball.right > scene.right) & (ball.v[1] > 0))
+            ball.v[1] *= -1
+        end
+
+		# パドルにあたったらはね返る
+        it_paddle = Intersects(ball, paddle)
+        if any(it_paddle) & (ball.v[2] > 0)
+            ball.v = [(ball.x[1] - paddle.center[1]) * 10, - ball.v[2]]
+            ball.v = ball.speed * ball.v / norm(ball.v)
+        end
+
+        (brick -> (brick.is_valid) ? draw(brick) : () -> ()).(bricks)
+        draw(ball)
+        draw(paddle)
+    end
+end
+
+
+
+
+
+g.main = app_8
 
 runapp(g)
 
 
 
+#=
+# 接触時に互いの速度ベクトルが
+it = Intersects(obj, bd)
+if any([it.left, it.right, it.bottom, it.top])
+    nv = normvec(it, bd)
+    v_obj = refrect(v_obj, nv)
+end
+=# 
 
 #=
 # [REPL開発]
@@ -280,12 +408,13 @@ endapp(g) # 後処理など
 function app()
     ball_speed = [0, -240]
     ball, x_ball = Circle(r = 8), [200, 200]
-    brick = 
-    bricks = Grid(w = [40, 20], x = [16, 4]) # 座標として使う
+    gr_bricks = Grid(w = [40, 20], x = [16, 4]) # 座標として使う
+    block = Rectangle(w = [40, 20])
+    draw_bricks = x -> draw(block, x)
     paddle = Rectangle(w = [60, 10])
     while update!(g)
-        bd_ball = Boundary(2*ball.r, x_ball)
-        
+        draw()
+        bd_ball = Boundary(ball, ul=x_ball)
         Intersects(bd_ball, grid)
         sleep(0.01)
     end

@@ -140,7 +140,7 @@ export sdl_render_draw_abstract_rect
 # 
 function sdl_render_draw_circle_curve(renderer, x, r, θ)
     R = rot_2d_matrix(θ)
-    n = 2 * Int.(round(maximum(r)))
+    n = 3 * Int.(round(maximum(r)))
     f = (θ -> Int.(round.(x + r .* (R * [cos(θ), sin(θ)]))))
     p = f.(range(0, 2π, n))
     sdl_render_draw_points(renderer, p)
@@ -157,7 +157,7 @@ function sdl_render_draw_circle_donut(renderer, x, r0, r1, θ)
             if (r_inx/rx)^2 + (r_iny/ry)^2 <= (i/rx)^2 + (j/ry)^2 <= 1
                 # xx = x + r1 + [i, j]
                 xx = x + [i, j]
-                points[cnt] = xx
+                points[cnt] = intround.(xx)
                 cnt = cnt + 1
             end
         end

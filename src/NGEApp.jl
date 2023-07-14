@@ -43,7 +43,7 @@ mutable struct Scene
     t
     dt
     timing::Timing
-    Scene(w, t, dt)  = new(w, w / 2.0, t, dt, Timing())
+    Scene(w, t, dt)  = new(w, w .÷ 2, t, dt, Timing())
     Scene() = Scene([640, 480], 0.0, 0.0)
 end
 export Scene
@@ -100,7 +100,6 @@ export System
 `g.system.keyboard.scans[:w].down` でキーボードのwが押されたかを取得 \\
 ※ただし、`register_keys!(g, [..., :w, ...])` が実行されている必要がある。 \\
 `g.scene.timing[0.5]`は0.5秒ごとにtrueになるタイミングを与える。 \\
-
 """
 mutable struct App
     info::Info
@@ -189,6 +188,8 @@ function update!(g::App)
     sdl_render_clear(renderer)   # レンダークリア
     t = time()
     g.scene.dt = t - t_old
+    if g.scene.dt > 0.1 g.scene.dt = 0.1
+    end
     t_old = time()
     g.scene.t = t - t0
     for key = g.scene.timing.keys
