@@ -1,0 +1,744 @@
+
+
+
+abstract type AbstractGeometry end
+
+
+"""
+# AbstractType Geometry
+廃止予定
+Line, Circle, Rectangle, Pattern, EmptyGeom
+"""
+abstract type Geometry <: AbstractGeometry
+end
+
+
+
+
+
+
+
+"""
+# EmptyGeom
+空のオブジェクト実体 \\
+サイズのベクトルを持っている
+"""
+struct EmptyGeom <: Geometry
+    w::AbstractArray
+    EmptyGeom(eg::EmptyGeom) = new(eg.w)
+    function EmptyGeom(w = [32, 32])
+        return new(w)
+    end
+end
+export EmptyGeom
+Base.copy(eg::EmptyGeom) = EmptyGeom(eg)
+
+
+
+"""
+# Line
+## 説明
+線オブジェクト \\
+## how to use
+```
+line = Line([10, 50]) # 線の作成
+```
+"""
+struct Line <: Geometry
+    v::AbstractArray
+    w::AbstractArray
+    Line(line::Line) = new(line.v, line.w)
+    function Line(
+        v = [100, 100]
+    )
+        w = abs.(v)
+        return new(v, w)
+    end
+end
+export Line
+Base.copy(line::Line) = Line(line)
+
+
+
+"""
+# Circle
+円、楕円、ドーナツ型オブジェクト \\
+circle = Circle() #半径50の縁を生成 \\
+"""
+struct Circle <: Geometry
+    r::AbstractArray
+    r0::AbstractArray
+    θ::Real
+    w::AbstractArray
+    Circle(circle::Circle) = new(circle.r, circle.r0, circle.θ, circle.w)
+    function Circle(r = 50, r0 = r, θ = 0)
+        if typeof(r)  <: Real  r  = [r, r]
+        end
+        if typeof(r0) <: Real  r0 = [r0, r0]
+        end
+        w = 2 * r # require fix
+        return new(r, r0, θ, w)
+    end
+end
+export Circle
+Base.copy(circle::Circle) = Circle(circle)
+
+
+
+"""
+# Rectangle
+"""
+struct Rectangle <: Geometry
+    w::AbstractArray
+    Rectangle(rect::Rectangle) = new(rect.w)
+    function Rectangle(w = [100, 100])
+        return new(w)
+    end
+end
+export Rectangle
+Base.copy(rect::Rectangle) = Circle(rect)
+
+
+
+"""
+# Pattern
+"""
+struct Pattern <: Geometry
+    X::Matrix{Bool}
+    w::AbstractArray
+    Pattern(pat::Pattern) = Pattern(X=pat.X)
+    function Pattern(X = [true])
+        w = collect(size(X))
+        return new(X, w)
+    end
+end
+export Pattern
+
+
+
+"""
+# Font
+"""
+struct Font
+    file::AbstractString
+    font
+    Font(font::Font) = Font(file=font.file) # あんまり意味ない
+    function Font(file = samplefiles.nge.assets.ttf_files.NotoSansJP)
+        for ft in global_list_font_loaded
+            if file == ft.file
+                return ft
+            end
+        end
+        println("NGE: font loaded")
+        font = ttf_open_font(file)
+        push!(reserve_close, font)
+        if Int(font) == 0  error("NGE: ttf error can't read a font file") 
+        end
+        _font_ = new(file, font)
+        push!(global_list_font_loaded, _font_)
+        return _font_
+    end
+end
+export Font
+
+
+
+
+
+
+
+
+
+
+
+"""
+# Texture
+Moji, Image <: Texture
+"""
+abstract type Texture <: AbstractGeometry
+end
+
+
+
+"""
+# Moji
+文字を扱う。
+"""
+mutable struct Moji <: Texture
+    str::AbstractString
+    x0::AbstractArray
+    w0::AbstractArray
+    w::AbstractArray
+    texture
+    Moji(moji::Moji) = new(moji.str, moji.x0, moji.w0, moji.w, moji.texture)
+    function Moji(str = "Hello World !", font = Font(); color = RGBA(1, 1, 1, 1))
+        surface = ttf_render_UTF8_blanded(font.font, str, color)
+        texture = sdl_create_texture_from_surface(renderer, surface)
+        sdl_free_surface(surface)
+        push!(reserve_destroy, texture)
+        w1, w2 = sdl_query_texture(texture)
+        x0 = [0 , 0 ]
+        w0 = [w1, w2]
+        w  = [w1, w2]
+        return new(str, x0, w0, w, texture)
+    end
+end
+export Moji
+Base.copy(moji::Moji) = Moji(moji)
+
+
+
+# 多重読み込みに弱い
+"""
+# Image
+画像を扱う
+"""
+mutable struct Image <: Texture
+    file::AbstractString
+    x0::AbstractArray
+    w0::AbstractArray
+    w::AbstractArray
+    texture
+    Image(img::Image) = new("", img.x0, img.w0, img.w, img.texture)
+    function Image(file = samplefiles.nge.assets.img_files.sample0)
+        surface = img_load(file)
+        texture = sdl_create_texture_from_surface(renderer, surface)
+        sdl_free_surface(surface)
+        push!(reserve_destroy, texture)
+        w, h = sdl_query_texture(texture)
+        return new(file, [0, 0], [w, h], [w, h], texture)
+    end
+end
+export Image
+Base.copy(img::Image) = Image(img)
+
+
+
+
+
+
+
+
+
+
+"""
+# Object
+位置情報などを含むオブジェクト \\
+pinの実装がまだ(pinはオブジェクトと座標xの関係をピン止めする)
+"""
+mutable struct Object
+    obj::Union{Geometry, Texture}
+    x::AbstractArray
+    c::Union{AbstractArray, AbstractRGBA}
+    pin::Symbol
+    _dict_::Dict
+    Object(scene::Scene) = Object(EmptyGeom(scene.w))
+    Object(object::Object) = new(object.obj, object.x, obj)
+    function Object(
+        obj::Union{Geometry, Texture}
+        ; pin = :topleft
+    )
+        x = [0.0, 0.0]
+        c = RGBA(1, 1, 1, 1)
+        d = Dict{Symbol, Union{Real, AbstractArray}}(:_copy_x_ => copy(x))
+        return new(obj, x, c, pin, d)
+    end
+end
+export Object
+function Base.getproperty(object::Object, s::Symbol)
+    try 
+        return getfield(object, s)
+    catch 
+        if (! (object._dict_[:_copy_x_] == object.x))
+            for s = [:top, :bottom, :left, :right]
+                delete!(object._dict_, s)
+            end
+            for s = [:topleft, :topcenter, :topright, :leftcenter, :center, :rightcenter, :bottomleft, :bottomcenter, :bottomright]
+                delete!(object._dict_, s)
+            end
+            object._dict_[:_copy_x_] = object.x
+        end
+        try
+            return object._dict_[s]
+        catch
+            if s in [:top, :bottom, :left, :right]
+                if     s == :left   object.left = object.topleft[1]
+                elseif s == :top    object.top  = object.topleft[2]
+                elseif s == :right  object.right = object.bottomright[1]
+                elseif s == :bottom object.bottom = object.bottomright[2]
+                end
+                return getproperty(object, s)
+            end
+            if s in [:topleft, :topcenter, :topright, :leftcenter, :center, :rightcenter, :bottomleft, :bottomcenter, :bottomright]
+                try
+                    topleft = object._dict_[:topleft]
+                    object._dict_[s] = topleft_to_s(topleft, object.obj.w, s)
+                catch
+                    topleft = s_to_topleft(object.pin, object.x, object.obj.w)
+                    object.topleft = topleft
+                    object._dict_[s] = topleft_to_s(topleft, object.obj.w, s)
+                end
+                return getproperty(object, s)
+            end
+            @error("NGE: Object error occured")
+        end
+    end
+end
+function Base.setproperty!(object::Object, s::Symbol, val)
+    try
+        setfield!(object, s, val)
+    catch
+        object._dict_[s] = val
+    end
+end
+
+
+
+
+
+
+
+
+"""
+# Grid
+"""
+mutable struct Grid
+    w::AbstractArray
+    offset::AbstractArray
+    siz::AbstractArray
+    object::Matrix{Object}
+    Grid(w, offset, siz, object) = new(w, offset, siz, object)
+    function Grid(
+          w        = [32, 32]
+        , siz      = [20, 15]
+        ; offset   = [0, 0]
+    )
+        object   = fill(Object(EmptyGeom(w)), Tuple(siz))
+        n, m = siz
+        for i = 1:n for j = 1:m
+            each_object   = Object(EmptyGeom(w))
+            each_object.x = offset + ([i, j] .- 1) .* w
+            object[i, j]  = each_object
+            #=
+            x = offset + ([i, j] .- 1) .* w
+            object[i, j].x = x=#
+        end end
+        return new(w, offset, siz, object)
+    end
+end
+export Grid
+Base.getindex(gr::Grid, i::Int, j::Int) = gr.object[i, j]
+function Base.getindex(gr::Grid, ii::AbstractVector{Int64}, jj::AbstractVector{Int64})
+    w = gr.w
+    offset = gr.offset + w .* [ii[1], jj[1]]
+    siz = length.([ii, jj])
+    object = gr.object[ii, jj]
+    newgr =  Grid(w, offset, siz, object)
+    return newgr
+end
+function Base.collect(gr::Grid)
+    n, m = gr.siz
+    A = fill(gr[1, 1], (n, m))
+    for i = 1:n for j = 1:m
+        A[i, j] = gr[i, j]
+    end end
+    return A
+end
+Base.size(gr::Grid, d::Integer) = gr.siz[d]
+Base.size(gr::Grid) = (size(gr, 1), size(gr, 2))
+function Base.setindex!(gr::Grid, val::Object, i::Integer, j::Integer)
+    val.x = gr.offset + ([i, j] .- 1) .* gr.w
+    gr.object[i, j] = val
+end
+function Base.setindex!(gr::Grid, val::Object, ii::AbstractVector{Int64}, jj::AbstractVector{Int64})
+    n, m = size(gr)
+    for i = 1:n for j = 1:m
+        gr[i, j] = val
+    end end
+end
+function Base.setindex!(gr::Grid, val::Matrix{Object}, ii::AbstractVector{Int64}, jj::AbstractVector{Int64})
+    n, m = size(gr)
+    for i = 1:n for j = 1:m
+        gr[i, j] = val[i, j]
+    end end
+end
+function Base.setindex!(gr::Grid, val, i::Colon, j::Colon)
+    n, m = size(gr)
+    gr[1:n, 1:m] .= val
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+#=
+接触判定オブジェクト
+=#
+function each_intersects!(matview, object::Object, v::AbstractArray)
+    left , upper = object.topleft .< v
+    right, lower = v .< object.bottomright
+    matview .&= [
+        left & upper  right & upper; 
+        left & lower  right & lower
+    ]
+end
+function map_intersects(object::Object, b_object::Object)
+    ret = ones(Bool, 3, 3)
+    each_intersects!(view(ret, 1:2, 1:2), object, b_object.topleft)
+    each_intersects!(view(ret, 1:2, 2:3), object, b_object.topright)
+    each_intersects!(view(ret, 2:3, 1:2), object, b_object.bottomleft)
+    each_intersects!(view(ret, 2:3, 2:3), object, b_object.bottomright)
+    return ret
+end
+function intersectsmat_to_s(t, s::Symbol)
+    if     s == :top
+        return all(t[1:2, 2])
+    elseif s == :bottom
+        return all(t[2:3, 2])
+    elseif s == :left
+        return all(t[2, 1:2])
+    elseif s == :right 
+        return all(t[2, 2:3])
+    elseif s == :bounded
+        return t[2,2] & (sum(t) == 1)
+    elseif s == :bounds 
+        return all(t)
+    end
+    @error("Intersects creation failed")
+end
+
+
+"""
+# Intersects(object, b_object)
+"""
+mutable struct Intersects_old
+    object::Object
+    b_object::Object
+    _mat_::Matrix{Bool}
+    _dict_::Dict
+    function Intersects_old(object, b_object)
+        _mat_  = map_intersects(object, b_object)
+        _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
+        return new(object, b_object, _mat_, _dict_)
+    end
+end
+export Intersects_old
+function Base.getproperty(it::Intersects_old, s::Symbol)
+    try
+        return getfield(it, s)
+    catch
+        try
+            return it._dict_[s]
+        catch
+            if s in [:top, :bottom, :left, :right, :bounded, :bounds]
+                it._dict_[s] = intersectsmat_to_s(it._mat_, s)
+                return getproperty(it, s)
+            end
+            @error("NGE: Intersects error occured")
+        end
+    end
+end
+function Base.any(it::Intersects_old)
+    return it.top | it.bottom | it.left | it.right
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+_draw_
+"""
+_draw_(empgeo::EmptyGeom, x) = begin ; end # do nothing
+# 線の描写
+function _draw_(line::Line, x, linewidth = 1)
+    sdl_render_draw_abstract_line(renderer, x, line.v, linewidth, 0)
+end
+# 円、楕円、ドーナツ型の描写
+function _draw_(circle::Circle, x)
+    sdl_render_draw_abstract_circle(renderer, x + circle.r, circle.r0, circle.r, circle.θ)
+end
+# 長方形の描写
+function _draw_(rect::Rectangle, x, is_filled = false, linewidth = 1)
+    sdl_render_draw_abstract_rect(renderer, x, rect.w, linewidth, is_filled)
+end
+# パターン
+function _draw_(pattern::Pattern, x)
+    n, m = size(pattern.X)
+    for i = 1:n
+        points = fill(zeros(2), m)
+        cnt = 1
+        for j = 1:m
+            if pattern.X[j, i]
+                points[cnt] = intround.(x + [i, j] .- 1) 
+                cnt += 1
+            end
+        end
+        sdl_render_draw_points(renderer, points[1:cnt-2])
+    end
+end
+# Texture
+function _draw_(tex::Texture, x)
+    sdl_render_copy(
+        renderer, tex.texture, 
+        tex.x0, tex.w0, # コピー元
+        x     , tex.w   # コピー先
+    )
+end
+# Grid
+function _draw_(gr::Grid, x)
+    n, m = size(gr)
+    for i = 1:n for j = 1:m
+        sdl_render_draw_rect(renderer, x + gr[i, j].topleft, gr.w)
+    end end
+end
+"""
+# draw functions 
+以下のように用いる。\\
+`draw(Object::TYPE <: Union{Geometry, Texture}, vpos, color = color, ...)`
+## how to use 
+draw(c = RGBA(1, 0, 0, 1)) # 背景色で塗りつぶす \\
+`draw(Line(v = [100, 10]), [20, 40], c=RGBA(0, 1, 0, 1))`
+`pin`キーワードを設定すると描写する座標系を設定できる。
+"""
+function draw(
+      t::T, x
+    ; color    = RGBA(1, 1, 1, 1)
+    , x_is_int = false
+    , pin      = :topleft
+    , kwargs...
+) where T <: Union{Grid, Object, Geometry, Texture}
+    # xを丸める
+    x = intround.(x)
+    # xの表示座標を変更する
+    if (pin != :topleft) x = s_to_topleft(pin, x, t.w)
+    end
+    # 色を変更する
+    color_r = sdl_get_render_draw_color(renderer)
+    sdl_set_render_draw_color(renderer, color)
+    # 描写
+    _draw_(t, x; kwargs...)
+    # 色を元に戻す
+    sdl_set_render_draw_color(renderer, color_r)
+end
+# 背景の塗りつぶし
+function draw(; color = RGBA(0, 0, 0, 1))
+    color_r = sdl_get_render_draw_color(renderer)
+    sdl_set_render_draw_color(renderer, color)
+    sdl_render_clear(renderer)
+    sdl_set_render_draw_color(renderer, color_r)
+end
+function draw(str::AbstractString, x; font = Nothing, color = RGBA(1, 1, 1, 1), kwargs...)
+    if font != Nothing  moji = Moji(str, font; color = color)
+    else                moji = Moji(str; color = color)
+    end
+    draw(moji, x; kwargs...)
+    sdl_destroy(moji.texture)
+    pop!(reserve_destroy)
+    moji = Nothing
+end
+draw(gr::Grid; kwargs...) = draw(gr, [0, 0]; kwargs...)
+draw(object::Object; kwargs...) = draw(object.obj, object.topleft; kwargs...)
+export draw
+
+
+
+# need pop reserve_list #
+function destroy(tex::Texture)
+    destroy(tex.texture)
+    tex = Nothing
+end
+
+
+
+"""
+scale functions
+"""
+function scale!(tex::Texture, a::Union{AbstractArray, Real})
+    tex.w = intround.(a .* tex.w)
+end
+export scale!
+
+
+
+"""
+rotate functions
+"""
+function rotate!()
+    ;
+end
+
+
+
+"""
+# resize functions
+ImageやMojiの描画サイズを設定します。
+"""
+function resize!(tex::Texture, w::AbstractArray)
+    tex.w = w
+end
+export resize!
+
+
+
+
+
+"""
+# cut_texture, cut_texture!
+元画像のうち、切り取るサイズ`w`とオフセット`offset`を与え、ImageやMojiを特定の大きさで切ります。\\
+特定のサイズのグリッド状にしたい場合は縦横の要素数`siz`を与えてください。
+```
+img  = Image(file)
+imgs = cut_texture(img, [3, 5])
+```
+"""
+function cut_texture!(tex::Texture, w; offset = [0, 0])
+    if w > tex.w0 @error("NGE: cut_texture! > cut size inccorrect ?") end
+    tex.x0  = tex.x0 + offset
+    tex.w0  = w
+    tex.w   = w
+end
+function cut_texture(tex::Texture)
+    newtex = copy(tex)
+    cut_texture!(newtex)
+    return newtex
+end
+function cut_texture(tex::Texture, siz)
+    n, m = siz
+    w = tex.w0 .÷ siz
+    m_tex = fill(tex, (n, m))
+    for i = 1:n for j = 1:m
+        newtex = copy(tex)
+        cut_texture!(newtex, w, offset = tex.x0 + ([i, j] .- 1) .* w)
+        m_tex[i, j] = newtex
+    end end
+    return m_tex
+end
+export cut_texture, cut_texture!
+
+
+
+
+
+
+
+
+
+
+
+
+#=
+"""
+_draw_
+"""
+_draw_(empgeo::EmptyGeom, x) = begin ; end # do nothing
+# 線の描写
+function _draw_(line::Line, x, linewidth = 1)
+    sdl_render_draw_abstract_line(renderer, x, line.v, linewidth, 0)
+end
+# 円、楕円、ドーナツ型の描写
+function _draw_(circle::Circle, x)
+    sdl_render_draw_abstract_circle(renderer, x + circle.r, circle.r0, circle.r, circle.θ)
+end
+# 長方形の描写
+function _draw_(rect::Rectangle, x, is_filled = false, linewidth = 1)
+    sdl_render_draw_abstract_rect(renderer, x, rect.w, linewidth, is_filled)
+end
+# パターン
+function _draw_(pattern::Pattern, x)
+    n, m = size(pattern.X)
+    for i = 1:n
+        points = fill(zeros(2), m)
+        cnt = 1
+        for j = 1:m
+            if pattern.X[j, i]
+                points[cnt] = intround.(x + [i, j] .- 1) 
+                cnt += 1
+            end
+        end
+        sdl_render_draw_points(renderer, points[1:cnt-2])
+    end
+end
+# Texture
+function _draw_(tex::Texture, x)
+    sdl_render_copy(
+        renderer, tex.texture, 
+        tex.x0, tex.w0, # コピー元
+        x     , tex.w   # コピー先
+    )
+end
+# Grid
+function _draw_(gr::Grid, x)
+    n, m = size(gr)
+    for i = 1:n for j = 1:m
+        sdl_render_draw_rect(renderer, x + gr[i, j].topleft, gr.w)
+    end end
+end
+"""
+# draw functions 
+以下のように用いる。\\
+`draw(Object::TYPE <: Union{Geometry, Texture}, vpos, color = color, ...)`
+## how to use 
+draw(c = RGBA(1, 0, 0, 1)) # 背景色で塗りつぶす \\
+`draw(Line(v = [100, 10]), [20, 40], c=RGBA(0, 1, 0, 1))`
+`pin`キーワードを設定すると描写する座標系を設定できる。
+"""
+function draw(
+      t::T, x
+    ; color    = RGBA(1, 1, 1, 1)
+    , x_is_int = false
+    , pin      = :topleft
+    , kwargs...
+) where T <: Union{Grid, Object, Geometry, Texture}
+    # xを丸める
+    x = intround.(x)
+    # xの表示座標を変更する
+    if (pin != :topleft) x = s_to_topleft(pin, x, t.w)
+    end
+    # 色を変更する
+    color_r = sdl_get_render_draw_color(renderer)
+    sdl_set_render_draw_color(renderer, color)
+    # 描写
+    _draw_(t, x; kwargs...)
+    # 色を元に戻す
+    sdl_set_render_draw_color(renderer, color_r)
+end
+# 背景の塗りつぶし
+function draw(; color = RGBA(0, 0, 0, 1))
+    color_r = sdl_get_render_draw_color(renderer)
+    sdl_set_render_draw_color(renderer, color)
+    sdl_render_clear(renderer)
+    sdl_set_render_draw_color(renderer, color_r)
+end
+function draw(str::AbstractString, x; font = Nothing, color = RGBA(1, 1, 1, 1), kwargs...)
+    if font != Nothing  moji = Moji(str, font; color = color)
+    else                moji = Moji(str; color = color)
+    end
+    draw(moji, x; kwargs...)
+    sdl_destroy(moji.texture)
+    pop!(reserve_destroy)
+    moji = Nothing
+end
+draw(gr::Grid; kwargs...) = draw(gr, [0, 0]; kwargs...)
+draw(object::Object; kwargs...) = draw(object.obj, object.topleft; kwargs...)
+export draw
+=#
+

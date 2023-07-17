@@ -8,46 +8,35 @@ using SimpleDirectMediaLayer
 以下のようなファイルがあります。\\
 ```
 samples = SampleFiles()
-samples.nge.assets.ttf_files.NotoSansJP # font
-samples.nge.assets.img_files.sample0
-samples.nge.assets.img_files.sample1
-samples.nge.assets.img_files.sample2
-samples.sdl.assets.cat
-samples.sdl.assets.fonts.BVSM
-samples.sdl.assets.fonts.FiraCode
+samples.sdl.cat
+samples.sdl.BVSM
+samples.sdl.FiraCode
+samples.nge.NotoSansJP # font
+samples.nge.NotoEmoji
+samples.nge.sample0
+samples.nge.sample1
+samples.nge.sample2
+samples
 ```
 """
-struct SampleFiles
-    sdl::NamedTuple
-    nge::NamedTuple
-    SampleFiles() = begin
-        SDLDIR = pkgdir(SimpleDirectMediaLayer)
-        NGEDIR = @__DIR__
-        sdl = (
-            assets = (
-                cat = SDLDIR * "\\assets\\cat.png", 
-                fonts = (
-                    BVSM = SDLDIR * "\\assets\\fonts\\Bitstream-Vera-Sans-Mono\\VeraMono.ttf", 
-                    FiraCode = SDLDIR * "\\assets\\fonts\\FiraCode\\ttf\\FiraCode-Light.ttf", 
-                ), 
-            ), 
-        )
-        nge = (
-            assets = (
-                ttf_files = (
-                    NotoSansJP = NGEDIR * "\\..\\assets\\ttf_files\\Noto_Sans_JP\\NotoSansJP-VariableFont_wght.ttf", 
-                ), 
-                img_files = (
-                    sample0 = NGEDIR * "\\..\\assets\\img_files\\sample0.png", 
-                    sample1 = NGEDIR * "\\..\\assets\\img_files\\sample1.png", 
-                    sample2 = NGEDIR * "\\..\\assets\\img_files\\sample2.png", 
-                ), 
-            ), 
-        )
-        return new(sdl, nge)
-    end
-end
+struct SampleFiles sdl; nge end
 export SampleFiles
-
-
+function SampleFiles()
+    SDLDIR = pkgdir(SimpleDirectMediaLayer)
+    NGEDIR = @__DIR__
+    sdl = (
+        cat = SDLDIR * "\\assets\\cat.png", 
+        BVSM = SDLDIR * "\\assets\\fonts\\Bitstream-Vera-Sans-Mono\\VeraMono.ttf", 
+        FiraCode = SDLDIR * "\\assets\\fonts\\FiraCode\\ttf\\FiraCode-Light.ttf", 
+    )
+    nge = (
+        NotoSansJP = NGEDIR * "\\..\\assets\\ttf_files\\Noto_Sans_JP\\NotoSansJP-VariableFont_wght.ttf", 
+        NotoEmoji = NGEDIR * "\\..\\assets\\ttf_files\\Noto_Emoji\\NotoEmoji-VariableFont_wght.ttf", 
+        sample0 = NGEDIR * "\\..\\assets\\img_files\\jisaku\\sample0.png", 
+        sample1 = NGEDIR * "\\..\\assets\\img_files\\jisaku\\sample1.png", 
+        sample2 = NGEDIR * "\\..\\assets\\img_files\\jisaku\\sample2.png", 
+    )
+    
+    return SampleFiles(sdl, nge)
+end
 

@@ -1,5 +1,9 @@
 
 
+#=
+・習熟に時間が掛からない
+・コードの可読性が高い
+=#
 
 using .NGESDL
 using Colors, LinearAlgebra
