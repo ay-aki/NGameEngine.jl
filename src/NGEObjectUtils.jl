@@ -17,6 +17,7 @@ rotate functions
 function rotate!()
     ;
 end
+export rotate!
 
 
 
@@ -27,7 +28,7 @@ ImageやMojiの描画サイズを設定します。
 function Base.resize!(val::Texture, w)
     val.rect.w = w
 end
-function Base.resize!(val::Image, w)
+function Base.resize!(val::Union{Image, Moji}, w)
     resize!(val.tex, w)
 end
 export resize!
@@ -157,25 +158,29 @@ end
 function draw(val::Union{Image, Moji}; x = Nothing, kwargs...)
     _draw_(val; kwargs...)
 end
-function draw(str::AbstractString, x; font = Nothing, color = RGBA(1, 1, 1, 1), kwargs...)
+function draw(str::AbstractString, x; font = Nothing, color = RGBA(1, 1, 1, 1), w = Nothing, a = 1, kwargs...)
     if font != Nothing
         moji = Moji(str, font; color = color)
     else
         moji = Moji(str; color = color)
     end
+    if w != Nothing  moji.tex.rect.w = w 
+    end
+    moji.tex.rect.w = intround.(a .* moji.tex.rect.w)
     moji.tex.rect.x = x
     draw(moji; kwargs...)
-    # テクスチャを開放
     sdl_destroy(moji.tex.texture)
     pop!(reserve_destroy)
     moji = Nothing
 end
-function draw(val, x::AbstractArray; kwargs...)
-    x, val.x = val.x, x
-    draw(val)
-    x, val.x = val.x, x
-end
 draw(gr::Grid; kwargs...) = _draw_(gr; kwargs...)
 draw(em::Empty) = _draw_(em)
+function draw(val, x#=::AbstractArray=#; kwargs...)
+    x, val.x = val.x, x
+    draw(val; kwargs...)
+    x, val.x = val.x, x
+end
 export draw
+
+
 

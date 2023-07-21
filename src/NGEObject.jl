@@ -59,6 +59,25 @@ get_positionals(val, s::Symbol) = begin
     end
 end
 
+set_positionals!(val, s::Symbol, a) = begin
+    if     s == :top
+        topleft     = val.topleft
+        val.topleft = [topleft[1], a]
+    elseif s == :left 
+        topleft     = val.topleft
+        val.topleft = [a, topleft[2]]
+    elseif s == :bottom
+        bottomleft     = val.bottomleft
+        val.bottomleft = [bottomleft[1], a]
+    elseif s == :right
+        bottomright     = val.bottomright
+        val.bottomright = [a, bottomright[2]]
+    else
+        @error("NGE: error in set_positionals!")
+    end
+end
+
+r_to_2dim(r) = (typeof(r) <: Real) ? [r, r] : r
 
 function surface_to_texture(surface)
     texture = sdl_create_texture_from_surface(renderer, surface)
@@ -93,6 +112,7 @@ function Font(file::String = samplefiles.nge.NotoSansJP)
     font = ttf_open_font(file)
     if Int(font) == 0  error("NGE: ttf error can't read a font file") 
     end
+    ttf_set_font_hinting(font)
     push!(reserve_close, font)
     _font_ = Font(get_id(), file, font)
     push!(list_font_loaded, _font_)
@@ -132,14 +152,14 @@ Circle(r = 50) = Circle([0, 0], r, new_dict())
 """
 mutable struct Donut o; r; r0; _dict_ end
 export Donut
-Donut(r = [50, 50], r0 = [25, 25]) = Donut([0, 0], r, r0, new_dict())
+Donut(r = [50, 50], r0 = [25, 25]) = Donut([0, 0], r_to_2dim(r), r_to_2dim(r0), new_dict())
 
 """
 # Ellipse
 """
 mutable struct Ellipse o; r; _dict_ end
 export Ellipse
-Ellipse(r = [50, 30]) = Ellipse([0, 0], r, new_dict())
+Ellipse(r = [50, 30]) = Ellipse([0, 0], r_to_2dim(r), new_dict())
 
 """
 # Pattern
@@ -171,7 +191,7 @@ function Image(file = samplefiles.nge.sample0)
     push!(list_image_loaded, _img_)
     return _img_
 end
-Base.copy(img::Image) = Image(img.file, copy(img.tex), img._dict_)
+Base.copy(img::Image) = Image("", copy(img.tex), img._dict_)
 
 """
 # Moji
@@ -243,52 +263,14 @@ function Base.setproperty!(val::Geometry, name::Symbol, a)
         set_x!(val, a)
     elseif name in get_list_positions()
         val.x = a + get_dx_to_topleft(name, get_bound(val))
+    elseif name in get_list_positionals()
+        set_positionals!(val, name, a)
     elseif name in fieldnames(typeof(val))
         setfield!(val, name, a)
     else
         val._dict_[name] = a
     end
 end
-
-
-
-
-
-#=
-"""
-# Expand_Object
-廃止
-"""
-struct Expand_Object obj; _dict_::Dict end
-export Expand_Object
-function expand(obj)
-    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
-    return Expand_Object(obj, _dict_)
-end
-export expand
-function Base.getproperty(val::Expand_Object, name::Symbol)
-    if name in fieldnames(Expand_Object)
-        return getfield(val, name)
-    elseif (name in fieldnames(typeof(val.obj))) | (name in get_list_positions()) | (name in get_list_positionals()) | (name == :x)
-        return getproperty(val.obj, name)
-    elseif name in keys(val._dict_)
-        return val._dict_[name]
-    else
-        @error("NGe: error getproperty of Expand_Object")
-    end
-end
-function Base.setproperty!(val::Expand_Object, name::Symbol, a)
-    if name in fieldnames(Expand_Object)
-        setfield!(val, name, a)
-    elseif (name in fieldnames(typeof(val.obj))) | (name in get_list_positions()) | (name in get_list_positionals()) | (name == :x)
-        setproperty!(val.obj, name, a)
-    else
-        val._dict_[name] = a
-    end
-end
-=#
-
-
 
 
 
@@ -347,29 +329,21 @@ end
 
 
 
-
+# Boundary Shape Transformation
 
 Rect(rect::Rect) = rect
-Rect(val::Union{Circle, Donut, Ellipse}) = begin 
-    rect = Rect(2 * val.r .* ones(Integer, 2))
+Rect(val::Union{Line, Circle, Donut, Ellipse, Image, Moji}) = begin 
+    rect = Rect(get_bound(val))
     rect.x = val.x
     return rect
 end
-Rect(val::Union{Image, Moji}) = begin
-    rect   = Rect(val.tex.rect.w)
-    rect.x = val.tex.rect.x
-    return rect
+
+Circle(circle::Circle) = circle
+Circle(val::Union{Donut, Ellipse}) = begin # 囲む円
+    circle   = Circle(max(val.r[1], val.r[2]))
+    circle.o = val.o
+    return circle
 end
 
-#=
-shape_of(val::Expand_Object) = begin
-    return Rect(val.obj)
-    #type = typeof(val.obj)
-    #if     type <: Union{Line, Circle, Rect}
-    #    return val.obj
-    #else
-    #    return Rect(val.obj)
-    #end
-end
 
-=#
+

@@ -2,7 +2,7 @@
 
 
 """
-外積で線の領域が線に対して異なるか同じ課を返す。
+外積で線の領域が線に対して異なるか同じかを返す。
 """
 function judge_cross_each(v, v1, v2)
     v_  = vcat(v, [0])
@@ -29,13 +29,6 @@ function judge_cross(x0, x1, y0, y1)
     each_2 = judge_cross_each(y1 - y0, x0 - y0, x1 - y0)
     return each_1 & each_2
 end
-
-
-Shape = Union{Rect, Line, Vector}#, Circle}
-
-
-
-
 
 
 """
@@ -86,11 +79,31 @@ function _intersectsmat_to_s(t, s::Symbol)
     @error("Intersects creation failed")
 end
 
+function _intersects_circle_vs_rect_cross(sh::Circle, b_sh::Rect)
+    dis = abs.(sh.o - b_sh.center)
+    if any(dis .>  (b_sh.w .÷ 2 .+ sh.r))
+        return false
+    end
+    if any(dis .<= (b_sh.w .÷ 2)) 
+        return true
+    end
+    return (sum((dis - b_sh.w .÷ 2) .^ 2) <= sh.r ^ 2)
+end
 
-
-
-
-
+function _intersects_circle_vs_rect(sh::Circle, b_sh::Rect)
+    cross = _intersects_circle_vs_rect_cross(sh, b_sh)
+    it_rect = Intersects(Rect(sh), b_sh)
+    top   = cross & it_rect.top
+    bottom= cross & it_rect.bottom
+    left  = cross & it_rect.left
+    right = cross & it_rect.right
+    #=
+    top   = cross & (dis[2] <= 0)
+    bottom= cross & (dis[2] >= 0)
+    left  = cross & (dis[1] <= 0)
+    right = cross & (dis[1] >= 0)=#
+    return cross, top, bottom, left, right
+end
 
 
 
@@ -103,9 +116,12 @@ it_line_vs_line.cross # 交差しているか？
 
 ```
 """
-struct Intersects shape; b_shape; _dict_::Dict end
+struct Intersects{T1, T2} shape::T1; b_shape::T2; _dict_::Dict end
 export Intersects
-# 線分のクロス判定
+
+
+
+# Line vs Line
 function Intersects(sh::Line, b_sh::Line)
     _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
     x0, x1 = sh.x, sh.x + sh.vec
@@ -113,7 +129,8 @@ function Intersects(sh::Line, b_sh::Line)
     _dict_[:cross] = judge_cross(x0, x1, y0, y1)
     return Intersects(sh, b_sh, _dict_)
 end
-# 長方形領域の接触判定
+Base.any(it::Intersects{Line, Line}) = it.cross
+# Rect vs Rect
 function Intersects(sh::Rect, b_sh::Rect)
     _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
     _mat_ = _map_intersects(sh, b_sh)
@@ -123,33 +140,61 @@ function Intersects(sh::Rect, b_sh::Rect)
     end
     return Intersects(sh, b_sh, _dict_)
 end
-# 点と長方形領域の接触判定
-function Intersects(x::Vector, b_sh::Rect)
-    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
-    _dict_[:_mat_] = _map_intersects(x, b_sh)
-    _dict_[:bounded] = _mat_[2, 2]
-    return Intersects(x, b_sh, _dict_)
-end
-function Intersects(sh::Rect, x::Vector)
-    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
-    _dict_[:_mat_] = _map_intersects(x, sh)
-    _dict_[:bounds] = _mat_[2, 2]
-    return Intersects(sh, x, _dict_)
-end
-# 円の接触判定
+Base.any(it::Intersects{Rect, Rect}) = it.left | it.right | it.top | it.bottom
+# Circle vs Circle
 function Intersects(sh::Circle, b_sh::Circle)
     _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
     touch = (norm(sh.o - b_sh.o) < (sh.r + b_sh.r))
-    _dict_[:touch] = touch
+    _dict_[:cross] = _dict_[:touch] = touch
     return Intersects(sh, b_sh, _dict_)
 end
-# Expanded_Object
-#=
-function Intersects(sh::Expand_Object, b_sh::Expand_Object)
-    v1, v2 = shape_of(sh), shape_of(b_sh)
-    return Intersects(v1, v2)
+Base.any(it::Intersects{Circle, Circle}) = it.cross
+# Circle vs Vector
+function Intersects(sh::Circle, x::Vector)
+    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
+    cross = (sh.r < norm(x - sh.o))
+    _dict_[:cross] = cross
+    return Intersects(sh, x, _dict_)
 end
-=#
+Intersects(x::Vector, sh::Circle) = Intersects(sh, x)
+Base.any(it::Intersects{Circle, Vector}) = it.cross
+# Vector vs Rect
+function Intersects(x::Vector, b_sh::Rect)
+    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
+    _dict_[:_mat_] = _map_intersects(x, b_sh)
+    _dict_[:cross] = _mat_[2, 2]
+    return Intersects(x, b_sh, _dict_)
+end
+Intersects(sh::Rect, x::Vector) = Intersects(x, sh)
+Base.any(it::Intersects{Vector, Rect}) = it.cross
+# Circle vs Rect
+function Intersects(sh::Circle, b_sh::Rect)
+    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
+    cross, top, bottom, left, right = _intersects_circle_vs_rect(sh, b_sh)
+    _dict_[:cross] = cross
+    _dict_[:top] = top
+    _dict_[:bottom] = bottom
+    _dict_[:left] = left
+    _dict_[:right] = right
+    return Intersects(sh, b_sh, _dict_)
+end
+function Intersects(sh::Rect, b_sh::Circle)
+    _dict_ = Dict{Symbol, Union{Real, AbstractArray}}()
+    cross, bottom, top, right, left = _intersects_circle_vs_rect(b_sh, sh)
+    _dict_[:cross] = cross
+    _dict_[:top] = top
+    _dict_[:bottom] = bottom
+    _dict_[:left] = left
+    _dict_[:right] = right
+    return Intersects(sh, b_sh, _dict_)
+end
+Base.any(it::Intersects{Circle, Rect}) = it.cross
+# 定義できない場合は、図形を囲む長方形領域を比較する。
+function Intersects(sh, b_sh)
+    Intersects(Rect(sh), Rect(b_sh))
+end
+
+
 
 
 
@@ -160,43 +205,5 @@ function Base.getproperty(itsh::Intersects, name::Symbol)
         return itsh._dict_[name]
     end
 end
-function Base.any(it::Intersects)
-    type1, type2 = typeof(it.shape), typeof(it.shape) 
-    if     type1 == type2 == Rect
-        return it.top | it.bottom | it.left | it.right
-    elseif type1 == type2 == Line
-        return it.cross
-    elseif (type1 == Vector) & (type2 == Rect)
-        return it.bounded
-    elseif (type1 == Rect) & (type2 == Vector)
-        return it.bounds
-    elseif type1 == type2 == Circle
-        return it.touch
-    else
-        @error("NGE: error Base.any(Intersects)")
-    end
-end
 
 
-
-#=
-it = Intersects(rect, b_rect)
-any(it) # どこかが触れている
-it.top # rectの上部がb_rectと触れている
-   bottom
-   left
-   right
-it.bounds # rectがb_rectを含む
-it.bounded # rectがb_rectに含まれる
-
-it = Intersects(line, line)
-it.cross
-
-it = Intersects(rect, [x1, x2])
-it.bounds # 点を含む
-
-it = Intersects([x1, x2], rect)
-it.bounded # 点が含まされる(上記の逆)
-
-any(it) # どこがが触れている
-=#

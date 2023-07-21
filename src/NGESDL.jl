@@ -46,16 +46,16 @@ export sdl_create_window_and_renderer
 sdl_event_init() = Ref{SDL_Event}()
 export sdl_event_init
 # 
-function sld_poll_event(event)
+function sdl_poll_event(event)
     flag_end_loop = SDL_PollEvent(event) |> Bool
     return event[], !flag_end_loop
 end
-export sld_poll_event
+export sdl_poll_event
 # 
 function sdl_poll_events(event)
     evts = []
     while true
-        evt, flag_poll_event = sld_poll_event(event)
+        evt, flag_poll_event = sdl_poll_event(event)
         if flag_poll_event 
             break
         end
@@ -64,6 +64,53 @@ function sdl_poll_events(event)
     return evts
 end
 export sdl_poll_events
+
+
+
+#=
+[-29, -127, -126, 0]
+
+sdl_NTuple4_to_char([-28, -69, -78])
+sdl_NTuple4_to_char([-23, -106, -109])
+
+sdl_NTuple32_to_string([-28, -69, -78, -23, -106, -109, 0, 28, 0, 0, 0, 0, 12, 0, 0, 0])
+
+function sdl_NTuple4_to_char(vec)
+    f = x -> (x < 0) ? 256 + x : x
+    c = String(collect(UInt8.(f.(vec))))[1]
+    return c
+end
+
+function sdl_NTuple32_to_string(vec)
+    s = ""
+    for i = 1:4
+        c = sdl_NTuple4_to_char(vec[(4*(i-1)+1):(4*i)])
+        println(vec[(4*(i-1)+1):(4*i)], c)
+        # if  c == '\0' break end
+        s *= c#(isprint(c)) ? c : ""
+    end
+    return s
+end=#
+
+
+function sdl_NTuple32_to_string(vec)
+    ret = ""
+    f = x -> (x < 0) ? 256 + x : x
+    str = String(collect(UInt8.(f.(vec))))
+    i = 1
+    while (i <= 32) & isprint(str[i]) & isvalid(str[i])
+        ret *= str[i]
+        i = nextind(str, i)
+    end
+    return ret
+end
+
+
+struct NTuple32Cchar ctext end
+export NTuple32Cchar
+function Base.String(text::NTuple32Cchar)
+    return sdl_NTuple32_to_string(text.ctext)
+end
 
 
 
@@ -311,7 +358,8 @@ ttf_init() = TTF_Init()
 export ttf_init
 ttf_quit() = TTF_Quit()
 export ttf_quit
-ttf_open_font(file) = TTF_OpenFont(file, 40)
+ttf_open_font(file) = TTF_OpenFont(file, 20)
+ttf_open_font(file, pointsize) = TTF_OpenFont(file, pointsize)
 export ttf_open_font
 ttf_close_font(font) = TTF_CloseFont(font)
 export ttf_close_font
@@ -330,6 +378,9 @@ ttf_render_UTF8_blanded(font, str, c::AbstractRGBA) = ttf_render_UTF8_blanded(
     [c.r*255, c.g*255, c.b*255, c.alpha*255]
 )
 export ttf_render_UTF8_blanded
+ttf_set_font_hinting(font) = TTF_SetFontHinting(font, TTF_HINTING_NORMAL)
+export ttf_set_font_hinting
+
 
 
 

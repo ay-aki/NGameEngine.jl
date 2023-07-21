@@ -3,6 +3,7 @@
 #=
 ・習熟に時間が掛からない
 ・コードの可読性が高い
+・自然な文法
 =#
 
 using .NGESDL
@@ -22,16 +23,15 @@ reserve_destroy = [] # destroy all
 
 mutable struct Info
     title::AbstractString
-    Info() = new("Title")
 end
-export Info
+Info() = Info("Title")
 
 mutable struct Timing
     keys
     timers
     timings # Bool
-    Timing() = new([], Dict(), Dict())
 end
+Timing() = Timing([], Dict(), Dict())
 function Base.getindex(ti::Timing, dt::Real)
     if !(dt in ti.keys)
         push!(ti.keys, dt)
@@ -47,50 +47,54 @@ mutable struct Scene
     t
     dt
     timing::Timing
-    Scene(w, t, dt)  = new(w, w .÷ 2, t, dt, Timing())
-    Scene() = Scene([640, 480], 0.0, 0.0)
 end
 export Scene
+Scene(w) = Scene(w, w .÷ 2, 0.0, 0.0, Timing())
+Scene()  = Scene([640, 480])
 
 mutable struct Wheel
     dx::AbstractArray
     is_wheeled::Bool
-    Wheel(dx, is_wheeled) = new(dx, is_wheeled)
-    Wheel() = Wheel([0, 0], false)
 end
+Wheel() = Wheel([0, 0], false)
 
 mutable struct Button
     down::Bool
     up::Bool
-    Button(down, up) = new(down, up)
-    Button() = Button(false, false)
 end
+Button() = Button(false, false)
 
 mutable struct Mouse
     x::AbstractArray
     lbutton::Button
     rbutton::Button
     wheel::Wheel
-    Mouse(x, lbutton, rbutton, wheel) = new(x, lbutton, rbutton, wheel)
-    Mouse() = Mouse([-1, -1], Button(), Button(), Wheel())
 end
-export Mouse
+Mouse() = Mouse([-1, -1], Button(), Button(), Wheel())
 
 mutable struct Keyboard
     keys  # 取得したいキーのリスト
     scans # キーに対応するフラグのリスト
-    Keyboard() = new([], Dict())
 end
-export Keyboard
+Keyboard() = Keyboard([], Dict())
+
+mutable struct InputText
+    text::AbstractString
+    textlength::Integer
+    composition::AbstractString
+    cursor::Integer
+    select_len::Integer
+end
+InputText() = InputText("", 100, "", 0, 0)
 
 mutable struct System
     win # 未使用 
     renderer # 未使用
     mouse::Mouse
     keyboard::Keyboard
-    System() = new(Nothing, Nothing, Mouse(), Keyboard())
+    inputtext::InputText
 end
-export System
+System() = System(Nothing, Nothing, Mouse(), Keyboard(), InputText())
 
 
 
@@ -110,9 +114,9 @@ mutable struct App
     scene::Scene
     system::System
     main::Function
-    App() = new(Info(), Scene(), System(), () -> ())
 end
 export App
+App() = App(Info(), Scene(), System(), () -> ())
 
 
 intround = (x -> Int(round(x)))
@@ -125,6 +129,12 @@ rot_2d_matrix(θ::Real) = [cos(θ) -sin(θ); sin(θ) cos(θ)]
 """
 キーボードキー登録
 """
+function register_key!(g::App, s::Symbol)
+    push!(g.system.keyboard.keys, s)
+    g.system.keyboard.scans[s] = Button(false, false)
+end
+export register_key!
+
 function register_keys!(g::App, ss)
     for s in ss
         push!(g.system.keyboard.keys, s)
@@ -173,10 +183,9 @@ export endapp
 """
 ゲーム実行関数
 """
-function runapp(g::App)
-    global section, win, renderer, event_ref, t0, t_old
+function runapp(g::App, args...; kwargs...)
     beginapp(g)
-    g.main()
+    g.main(args...; kwargs...)
     endapp(g)
 end
 export runapp
@@ -211,6 +220,9 @@ function update!(g::App)
     g.system.mouse.rbutton.down = false
     g.system.mouse.wheel.is_wheeled = false
     g.system.mouse.wheel.dx = [0, 0]
+    if length(g.system.inputtext.text) > g.system.inputtext.textlength # テキストが長くなり過ぎたら削除
+        g.system.inputtext.text = ""
+    end
     events = sdl_poll_events(event_ref)
     for e in events
         if     sdl_event_is(e, :SDL_QUIT)
@@ -242,12 +254,21 @@ function update!(g::App)
         elseif sdl_event_is(e, :SDL_MOUSEWHEEL)
             g.system.mouse.wheel.dx = [Int(e.wheel.x), Int(e.wheel.y)]
             g.system.mouse.wheel.is_wheeled = true
+        elseif sdl_event_is(e, :SDL_TEXTINPUT)
+            str = String(NTuple32Cchar(e.text.text))
+            g.system.inputtext.text *= str
+        elseif sdl_event_is(e, :SDL_TEXTEDITING)
+            g.system.inputtext.composition = String(NTuple32Cchar(e.edit.text))
+            g.system.inputtext.cursor      = e.edit.start + 1
+            g.system.inputtext.select_len  = e.edit.length
         end
     end
     g.system.mouse.x = sdl_mouse_position()
     return true
 end
 export update!
+
+
 
 
 
@@ -261,6 +282,7 @@ macro update!(g)
         end
     end
 end
+
 macro update!(g, expr)
     quote
         for i = 1:5
