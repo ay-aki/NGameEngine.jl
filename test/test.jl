@@ -433,9 +433,20 @@ function app_19(flag = true)
 end
 
 
+"""
+Audio sample
+"""
+function app_20()
+    aud = Audio()
+    play(aud, loops = 2)
+    while update!(g)
+        draw(Circle(100))
+    end
+end
 
 
-g.main = app_18
+
+g.main = app_20
 
 runapp(g)
 

@@ -1,13 +1,12 @@
 module NGE
 
 include("./NGESDL.jl")
+using .NGESDL
+using Colors, LinearAlgebra
+export norm, kron
 
 include("./NGEUtils.jl")
 
-using .NGESDL
-using Colors, LinearAlgebra
-
-export norm, kron
 
 global section, win, renderer, event_ref, events, t0, t_old
 
@@ -21,8 +20,14 @@ global global_list_font_loaded
 global_list_font_loaded = []
 
 include("./NGEAssets.jl")
-global samplefiles 
+
+global samplefiles
 samplefiles = SampleFiles()
+
+global list_font_loaded, list_image_loaded, list_audio_loaded
+list_font_loaded  = []
+list_image_loaded = []
+list_audio_loaded = []
 
 include("./NGEApp.jl")
 

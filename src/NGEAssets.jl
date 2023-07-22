@@ -16,7 +16,8 @@ samples.nge.NotoEmoji
 samples.nge.sample0
 samples.nge.sample1
 samples.nge.sample2
-samples
+samples.nge.mp3_sample0
+samples.nge.mp3_sample1
 ```
 """
 struct SampleFiles sdl; nge end
@@ -35,6 +36,8 @@ function SampleFiles()
         sample0 = NGEDIR * "\\..\\assets\\img_files\\jisaku\\sample0.png", 
         sample1 = NGEDIR * "\\..\\assets\\img_files\\jisaku\\sample1.png", 
         sample2 = NGEDIR * "\\..\\assets\\img_files\\jisaku\\sample2.png", 
+        mp3_sample0 = NGEDIR * "\\..\\assets\\audio_files\\otologic\\Loop01.mp3", 
+        mp3_sample1 = NGEDIR * "\\..\\assets\\audio_files\\otologic\\Onoma-Inspiration11-1(Low).mp3", 
     )
     
     return SampleFiles(sdl, nge)

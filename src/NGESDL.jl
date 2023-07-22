@@ -383,6 +383,32 @@ export ttf_set_font_hinting
 
 
 
+#=
+Audio functions
+=#
+function mix_open_audio(frequency, format, channels, chunksize)
+    flag = Mix_OpenAudio(frequency, format, channels, chunksize)
+    if flag == -1  @error "NGE: mix open failed"
+    end
+end
+mix_open_audio() = mix_open_audio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096)
+export mix_open_audio
+mix_init() = mix_open_audio()
+export mix_init
+mix_quit() = Mix_CloseAudio()
+export mix_quit
+mix_volume_music(volume) = Mix_VolumeMusic(volume)
+export mix_volume_music
+mix_load_mus(file) = Mix_LoadMUS(file)
+export mix_load_mus
+function mix_play_music(mus::Ptr{Mix_Music}; loops = 0)
+    Mix_PlayMusic(mus, loops)
+end
+# mix_play_music(mus::Ptr{Mix_Music}; loop = false) = Mix_PlayMusic(mus, Int(loop))
+export mix_play_music
+sdl_destroy(mus::Ptr{Mix_Music}) = Mix_FreeMusic(mus)
+
+
 
 end
 

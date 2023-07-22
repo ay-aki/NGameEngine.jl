@@ -184,3 +184,42 @@ export draw
 
 
 
+function _play_(aud::Audio; kwargs...)
+    return mix_play_music(aud.mus; kwargs...)
+end
+function _play_(aud::Empty)
+    ; # do nothing
+end
+"""
+# play
+```
+play(aud, loops = 3) # 3回ループする 
+play(volume = 100) # 音量を100にする(デフォルトは128)
+```
+"""
+function play(aud::Audio = Empty(); volume = -1, kwargs...)
+    mix_volume_music(volume)
+    _play_(aud; kwargs...)
+end
+function play(file::String; kwargs...)
+    aud = Audio(file)
+    play(aud; kwargs...)
+end
+export play
+
+function stop(aud::Audio)
+    ;
+end
+
+function current_volume()
+    return set_volume()
+end
+export current_volume
+
+
+# pause
+# resume
+# volume!
+
+
+
